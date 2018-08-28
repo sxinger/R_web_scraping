@@ -25,3 +25,5 @@ rxcuis<-unique(med$RXNORM_CUI)
 rxcui_map<-data.frame(rxcui=rxcuis) %>%
   do(mutate(.,rxcui_name=lapply(rxcui,get_rxcui_name)))
 
+
+#
