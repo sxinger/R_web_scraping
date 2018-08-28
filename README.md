@@ -7,7 +7,7 @@ Websites of interests:
 - https://ehrintelligence.com/topic/ehr-use-optimization;
 - 
 
-Additional learning mateirsl:
+Additional learning material:
 - about html and css: http://flukeout.github.io/; 
                       https://www.w3schools.com/htmL/; 
                       https://www.w3schools.com/css/;
