@@ -1,8 +1,10 @@
 get_pubmed_abstr<-function(query) {
   # change spaces to + and single-quotes to URL-friendly %22 in query
   query<-gsub("'", "%22", gsub(" ", "+", query))
-  query<-paste("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=", 
+  query<-paste("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmax=50&sort=relevance&term=", 
                query, "&usehistory=y", sep = "")
+  
+  
   
   #add an error-prevention machnism
   counter<-1 #in case there 

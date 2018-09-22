@@ -69,7 +69,12 @@ vari_key %<>%
                                `jpc-kumw im`="internal medicine",
                                `hyperlipidem`="hyperlipidemia",
                                `glucose,random`="glucose",
-                               `microalbumin, ran`="microalbumin")) %>%
+                               `microalbumin, ran`="microalbumin",
+                               `poc glucose`="glucose",
+                               `absolute lymph count`="lymph",
+                               `absolute mono count`="mono",
+                               `urine spec gravity`="urine specific gravity",
+                               `absolute eos count`="eosinophil")) %>%
   mutate(key_for_search=ifelse(VARIABLE_CATEG=="MEDICATIONS",gsub(" .*","",key_for_search),key_for_search))
 
 batch_size<-50
@@ -134,8 +139,7 @@ result<-vari_key %>%
                                ALLERGY="ALERTS, ALLERGY"))
 
 result %<>%
-  mutate(label=ifelse((pubmed_cnt<=2 | pubmed_cnt>=15) & rank<=150,
-                      key,"")) %>%
+  mutate(label=ifelse((pubmed_cnt<=8|pubmed_cnt>=48) & rank<=150,key,"")) %>%
   mutate(label=recode(label,
                       `gender_male`="sex_male",
                       `jpc-kumw im`="internal medicine visit")) %>%
@@ -147,13 +151,30 @@ saveRDS(abstr_key,file="./data/abstr_key.rda")
 saveRDS(result,file="./data/result.rda")
 
 #plot
-# abstr_key<-readRDS("./data/abstr_key.rda")
-# result<-readRDS("./data/result.rda")
+abstr_key<-readRDS("./data/abstr_key.rda")
+result<-readRDS("./data/result.rda")
 
 ggplot(result %>% filter(sel_cnt >= 10),
        aes(x=rank,y=pubmed_cnt,label=label))+
   geom_point()+geom_label_repel()+
   facet_wrap(~VARIABLE_CATEG,ncol=2) +
-  labs(x="Importance Rank",y="Article Counts on PubMed (max:20)")
+  labs(x="Importance Rank",y="Article Counts on PubMed (max:50)")
 
+#print out some results
+abstr_key$`2.anion gap`
+
+result %>%
+  group_by(pubmed_cnt) %>%
+  dplyr::summarize(cd_cnt=n(),
+                   min_rank=min(rank),
+                   q1_rank=quantile(rank,probs=0.25),
+                   med_rank=median(rank),
+                   q3_rank=quantile(rank,probs=0.75),
+                   max_rank=max(rank)) %>%
+  View
+
+result %>%
+  filter(pubmed_cnt==0) %>%
+  group_by(VARIABLE_CATEG) %>%
+  dplyr::summarize(cnt=n())
 
