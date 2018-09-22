@@ -5,7 +5,8 @@ This is my first attempt to try web-scraping in R
 
 Websites of interests:
 - https://ehrintelligence.com/topic/ehr-use-optimization;
-- 
+- https://rxnav.nlm.nih.gov/RxNormAPIREST.html
+
 
 Additional learning material:
 - about html and css: http://flukeout.github.io/; 
