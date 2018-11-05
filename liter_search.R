@@ -37,7 +37,7 @@ for(i in seq_len(nrow(query_grid))){
   start_i<-Sys.time()
 
   # Pubmed
-  liter_pubmed<-get_pubmed_full(query,max_return=100)
+  liter_pubmed<-get_pubmed_full(query,max_return=200)
   liter_evol<-c(liter_evol,nrow(liter_pubmed))
   
   # Cochrane Library--TODO
