@@ -2,26 +2,24 @@
 rm(list=ls())
 gc()
 
-# trace(utils:::unpackPkgZip, edit=TRUE)
-
-library(rentrez)
-library(rscopus)
-library(XML)
-library(RCurl)
-library(stringr)
-library(dplyr)
-library(tidyr)
-library(magrittr)
-library(ggplot2)
-library(ggrepel)
-source("./util.R")
+source("./R/util.R")
+require_libraries(c("dplyr",
+                    "tidyr",
+                    "magrittr",
+                    "stringr",
+                    "rentrez",
+                    "rscopus",
+                    "XML",
+                    "RCurl",
+                    "ggplot2",
+                    "ggrepel"))
 
 AD_syn<-c("alzheimer","AD")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("machine learning",
-          "learning","algorithm","analytics",
-          "big data","large data","high-dimensional data")
+Alg_syn<-c("machine learning","knowledge discovery",
+           "learning","algorithm","analytics",
+           "big data","large data","high-dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
                         key2=c(EMR_syn,Alg_syn),
@@ -49,7 +47,7 @@ for(i in seq_len(nrow(query_grid))){
   # liter_scopus<-get_scopus_full(query,max_return=200)
   # liter_evol<-c(liter_evol,nrow(liter_scopus))
   
-  
+  # 
   
   liter<-liter_pubmed
   liter_evol<-c(liter_evol,nrow(liter))
