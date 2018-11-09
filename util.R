@@ -11,6 +11,37 @@ require_libraries<-function(package_list){
   }
 }
 
+shuffle_agent<-function(){
+  agent_lst<-c(
+    #Chrome
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 5.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36',
+    #Firefox
+    'Mozilla/4.0 (compatible; MSIE 9.0; Windows NT 6.1)',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
+    'Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (Windows NT 6.2; WOW64; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.0; Trident/5.0)',
+    'Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64; Trident/7.0; rv:11.0) like Gecko',
+    'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
+    'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)',
+    'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729)'
+  )
+  sample(agent_lst,1)
+}
+
 get_pubmed_full<-function(query,max_return=20) {
   keywd<-query
   # change spaces to + and single-quotes to URL-friendly %22 in query
@@ -121,13 +152,19 @@ get_pubmed_full<-function(query,max_return=20) {
     title<-unlist(title)
     cite<-c()
     for(i in seq_along(title)){
+      #rotate agent
+      agent<-shuffle_agent()
+      #sleep
+      brk_t<-sample(20:30,1)
+      Sys.sleep(brk_t)
+      
       query_url<-paste("https://scholar.google.com/scholar?as_q=",
                        gsub(" ","+",title[i]),
                        "&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
                        "&as_ylo=&as_yhi=&hl=en&as_sdt=0%2C5",
                        sep = "")
       
-      get_url<-getURL(query_url,.opts=myopt)
+      get_url<-getURL(query_url,.opts=list(useragent=agent,followlocation=TRUE))
       query<-htmlParse(get_url,encoding="UTF-8")
       
       cite_i<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']//a//text()",xmlValue)
@@ -139,10 +176,8 @@ get_pubmed_full<-function(query,max_return=20) {
         fill(rn,.direction="down") %>% ungroup %>%
         dplyr::select(rn,cite_type,cite_val) %>%
         spread(cite_type,cite_val)
+      
       cite %<>% bind_rows(cite_i)
-
-      brk_t<-sample(10:30,1)
-      Sys.sleep(brk_t)
     }
   }
   
@@ -185,6 +220,12 @@ get_google_scholar_full<-function(query,max_return=20){
   pg_n<-ceiling(max_return/10)
   data<-c()
   for(i in seq_len(pg_n)){
+    #rotate agent
+    agent<-shuffle_agent()
+    #sleep
+    brk_t<-sample(20:30,1)
+    Sys.sleep(brk_t)
+    
     query_url<-paste("https://scholar.google.com/scholar?start=",(i-1)*10,
                      "&as_q=",wd,"&as_epq=",phr,
                      "&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
@@ -192,6 +233,7 @@ get_google_scholar_full<-function(query,max_return=20){
                      sep = "")
     
     #parse xml
+    get_url<-getURL(query_url,.opts=list(useragent=agent,followlocation=TRUE))
     query<-htmlParse(get_url,encoding="UTF-8")
     
     if(i==1){
