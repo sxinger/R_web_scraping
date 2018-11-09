@@ -3,24 +3,22 @@ rm(list=ls())
 gc()
 
 # trace(utils:::unpackPkgZip, edit=TRUE)
-
-library(rentrez)
-library(rscopus)
-library(XML)
-library(RCurl)
-library(stringr)
-library(dplyr)
-library(tidyr)
-library(magrittr)
-library(ggplot2)
-library(ggrepel)
 source("./util.R")
+require_libraries(c("rentrez",
+                    "rscopus",
+                    "XML",
+                    "RCurl",
+                    "stringr",
+                    "dplyr",
+                    "tidyr",
+                    "magrittr",
+                    "ggplot2",
+                    "ggrepel"))
 
 AD_syn<-c("alzheimer","AD")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("machine learning",
-           "knowledge discovery","feature selection",
+Alg_syn<-c("machine learning","feature selection",
            "learning","algorithm","analytics",
            "big data","large data","high-dimensional data")
 
@@ -37,29 +35,44 @@ for(i in seq_len(nrow(query_grid))){
   
   start_i<-Sys.time()
 
+  # Cochrane Library--TODO
+  # liter_cochrane<-get_cochrane_full(query,max_return=200)
+  # liter_evol<-c(liter_evol,nrow(liter_pubmed))
+  
+  
   # Pubmed
   liter_pubmed<-get_pubmed_full(query,max_return=100)
   liter_evol<-c(liter_evol,nrow(liter_pubmed))
   
-  # Cochrane Library--TODO
-  # liter_cochrane<-get_cochrane_full(query,max_return=200)
-  # liter_evol<-c(liter_evol,nrow(liter_pubmed))
   
   # scopus --TODO
   # api_key<-"311c8c86fe53aba1e2107584fc41e390"
   # liter_scopus<-get_scopus_full(query,max_return=200)
   # liter_evol<-c(liter_evol,nrow(liter_scopus))
   
+  
+  # web of science -- TODO
+  
+  
   # WorldCat -- TODO
+  
   
   # Google Scholar
   liter_google<-get_google_scholar_full(query,max_return=100)
   liter_evol<-c(liter_evol,nrow(liter_google))
   
+  # WHO -- TODO
+  
+  
+  # Grey Literature -- TODO
+  
+  
   # stack all
-  liter<-liter_google %<>%
-    bind_rows(liter_pubmed %>% 
-                mutate(domain="ncbi.nlm.nih.gov"))
+  liter_data<-liter_google$data %<>% mutate(engine="google scholar")
+    bind_rows(liter_pubmed$data %>% mutate(engine="pubmed"))
+  
+  liter_meta<-liter_google$metadata %<>%
+    bind_rows(liter_pubmed$metadata)
   
   if(nrow(liter) > 0){
     #clean-up: contain target word group I?
