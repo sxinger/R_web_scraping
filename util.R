@@ -42,79 +42,6 @@ shuffle_agent<-function(){
   sample(agent_lst,1)
 }
 
-get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=20,api_key){
-  keywd<-query
-  api_key<-get_api_key(api_key)
-
-  # search scopus
-  if(api_type=="scopus"){
-    scopus_obj<-scopus_search(query=query,
-                              api_key=api_key,
-                              count=max_return,
-                              view="STANDARD",
-                              sort="relevancy",
-                              verbose=F)
-  }else{
-    scopus_obj<-sciencedirect_search(query=query,
-                                     api_key=api_key,
-                                     count=max_return,
-                                     view="STANDARD",
-                                     sort="relevancy",
-                                     verbose=F)
-  }
-
-  
-  # retrieve search result
-  article_cnt<-scopus_obj$total_results
-  
-  # retrieve scopus id
-  id<-sapply(scopus_obj$entries, function(x) gsub("SCOPUS_ID:","",x$`dc:identifier`))
-
-  # retrieve title
-  title<-sapply(scopus_obj$entries, function(x) gsub("\\\"","\"",x$`dc:title`))
-  
-  # retrieve author
-  author<-sapply(scopus_obj$entries, function(x) x$`dc:creator`)
-  
-  # retrieve date
-  date<-sapply(scopus_obj$entries, function(x) x$`prism:coverDate`)
-  
-  #retrieve journal
-  journal<-sapply(scopus_obj$entries, function(x) x$`prism:publicationName`)
-  
-  # retrieve link
-  link<-sapply(scopus_obj$entries, function(x) paste0("//doi.org/",x$`prism:doi `))
-  
-  # get citations
-  cite_by<-sapply(scopus_obj$entries, function(x) as.numeric(x$`citeby-count`))
-  
-  # retrieve domain
-  domain<-sapply(scopus_obj$entries, function(x) x$`prism:aggregationType`)
-  
-  # retrieve abstract
-  abstract<-sapply(id[seq_len(max_return)],function(x) abstract_retrieval(x,"scopus_id",api_key=api_key)) 
-  
-  data<-data.frame(retrieve_ord=seq_len(max_return),
-                   title=title[seq_len(max_return)],
-                   author=author[seq_len(max_return)],
-                   journal=journal[seq_len(max_return)],
-                   date=date[seq_len(max_return)],
-                   abstract=abstract,
-                   cite_by=cite_by[seq_len(max_return)],
-                   # cite_wos=cite_wos,
-                   link=link[seq_len(max_return)],
-                   domain=domain[seq_len(max_return)],
-                    stringsAsFactors = F)
-  
-  metadata<-data.frame(query=keywd,
-                       engine="scopus",
-                       search_result=article_cnt,
-                       sort_by="relevance")
-  
-  out<-list(data=data,metadata=metadata)
-  return(out)
-}
-
 get_pubmed_full<-function(query,max_return=20) {
   keywd<-query
   # formulate the query term
@@ -129,6 +56,9 @@ get_pubmed_full<-function(query,max_return=20) {
   get_url<-getURL(query,.opts=myopt)
   temp<-try(get_url)
   while(grepl("(Bad request)|(Error)+",temp) & counter <= 5) {
+    brk_t<-sample(10:30,1)
+    Sys.sleep(brk_t)
+    
     get_url<-getURL(query)
     temp<-try(get_url)
     counter<-counter+1
@@ -146,7 +76,18 @@ get_pubmed_full<-function(query,max_return=20) {
   ids<-unlist(ids)
   
   if(length(ids)==0){
-    abstracts<-list()
+    article_cnt<-0
+    data<-data.frame(retrieve_ord=NA,
+                     title=NA,
+                     author=NA,
+                     journal=NA,
+                     date=NA,
+                     abstract=NA,
+                     link=NA,
+                     domain=NA,
+                     grands=NA,
+                     stringsAsFactors = F)
+    article_cnt2<-0
   }else{
     data_pubmed<-entrez_fetch(db = "pubmed", id = ids, rettype = "xml",
                               parsed = TRUE)
@@ -216,60 +157,114 @@ get_pubmed_full<-function(query,max_return=20) {
     link<-xpathSApply(data_pubmed, "//PubmedData//ArticleIdList", function(x) {
       doi <- xpathSApply(x, "./ArticleId[@IdType='doi']", xmlValue)
       pmc <- xpathSApply(x, "./ArticleId[@IdType='pmc']", xmlValue)
-      ifelse(length(doi)==0,
-             paste0("/pmc/articles/",pmc),
-             paste0("//doi.org/",doi))
+      pubmed <- xpathSApply(x, "./ArticleId[@IdType='pubmed']", xmlValue)
+      ifelse(length(doi)!=0,paste0("//doi.org/",doi),
+             ifelse(length(pmc)!=0,paste0("//pmc/articles/",pmc),
+                    paste0("www.ncbi.nlm.nih.gov/pubmed/",pubmed)))
     })
     
-  #   #retrieve citations
-  #   title<-unlist(title)
-  #   cite<-c()
-  #   for(i in seq_along(title)){
-  #     #rotate agent
-  #     agent<-shuffle_agent()
-  #     #sleep
-  #     brk_t<-sample(20:30,1)
-  #     Sys.sleep(brk_t)
-  #     
-  #     query_url<-paste("https://scholar.google.com/scholar?as_q=",
-  #                      gsub(" ","+",title[i]),
-  #                      "&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
-  #                      "&as_ylo=&as_yhi=&hl=en&as_sdt=0%2C5",
-  #                      sep = "")
-  #     
-  #     get_url<-getURL(query_url,.opts=list(useragent=agent,followlocation=TRUE))
-  #     query<-htmlParse(get_url,encoding="UTF-8")
-  #     
-  #     cite_i<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']//a//text()",xmlValue)
-  #     cite_i<-data.frame(cite_src=unlist(cite_i)[unlist(sapply(cite_i,function(x) grepl("((Cited by)|(Web of Science))+",x)))],
-  #                        stringsAsFactors = F) %>%
-  #       mutate(cite_type=str_extract(cite_src,"((Cited by)|(Web of Science))+"),
-  #              cite_val=as.numeric(gsub("((Cited by )|(Web of Science: ))+","",cite_src)),
-  #              rn=ifelse(cite_type=="Cited by",1:n(),NA)) %>%
-  #       fill(rn,.direction="down") %>% ungroup %>%
-  #       dplyr::select(rn,cite_type,cite_val) %>%
-  #       spread(cite_type,cite_val)
-  #     
-  #     cite %<>% bind_rows(cite_i)
-  #   }
-  }
-  
   tot_retn<-length(title)
-  data<-data.frame(retrieve_ord=seq_len(tot_retn),
+  data<-data.frame(query=keywd,
+                   retrieve_ord=seq_len(tot_retn),
                    title=unlist(title),
                    author=unlist(author),
                    journal=unlist(journal),
                    date=unlist(paste(pub_yr,pub_mth,sep = "-")),
                    abstract=unlist(abstract),
-                   # cite_gs=cite$`Cited by`,
-                   # cite_wos=cite$`Web of Science`,
                    link=link,
                    domain=domain,
                    grands=unlist(grands),
                    stringsAsFactors = F)
   
+  article_cnt2<-nrow(data)
+  }
+  
+  metadata<-data.frame(engine="pubmed",
+                       query=keywd,
+                       sort_by="relevance",
+                       search_result=article_cnt,
+                       filter_result=article_cnt2,
+                       stringsAsFactors = F)
+  out<-list(data=data,metadata=metadata)
+  return(out)
+}
+
+
+
+get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=20,api_key){
+  keywd<-query
+  api_key<-get_api_key(api_key)
+  
+  # search scopus
+  if(api_type=="scopus"){
+    scopus_obj<-scopus_search(query=query,
+                              api_key=api_key,
+                              count=20,
+                              view="STANDARD",
+                              sort="relevancy",
+                              verbose=F)
+  }else{
+    scopus_obj<-sciencedirect_search(query=query,
+                                     api_key=api_key,
+                                     count=20,
+                                     view="STANDARD",
+                                     sort="relevancy",
+                                     verbose=F)
+  }
+  
+  
+  # retrieve search result
+  article_cnt<-scopus_obj$total_results
+  
+  # retrieve scopus id
+  id<-sapply(scopus_obj$entries, function(x) gsub("SCOPUS_ID:","",x$`dc:identifier`))
+  
+  # retrieve title
+  title<-sapply(scopus_obj$entries, function(x) gsub("\\\"","\"",x$`dc:title`))
+  
+  # retrieve author
+  author<-sapply(scopus_obj$entries, function(x) x$`dc:creator`)
+  
+  # retrieve date
+  date<-sapply(scopus_obj$entries, function(x) x$`prism:coverDate`)
+  
+  #retrieve journal
+  journal<-sapply(scopus_obj$entries, function(x) x$`prism:publicationName`)
+  
+  # retrieve link
+  link<-sapply(scopus_obj$entries, function(x) paste0("//doi.org/",x$`prism:doi`))
+  
+  # get citations
+  cite_by<-sapply(scopus_obj$entries, function(x) as.numeric(x$`citedby-count`))
+  
+  # retrieve domain
+  domain<-sapply(scopus_obj$entries, function(x) x$`prism:aggregationType`)
+  
+  # retrieve abstract
+  abstract<-c()
+  for(idi in id[seq_len(max_return)]){
+    get_abstr<-abstract_retrieval(idi,"scopus_id",api_key=api_key)
+    get_raw<-paste0(sapply(get_abstr$get_statement$content,function(h) rawToChar(as.raw(strtoi(h, 16L)))),collapse = "")
+    abstract<-c(abstract,paste(, collapse=" "))
+  }
+  
+  a<-abstract_retrieval(id[1],"scopus_id",api_key=api_key)
+  
+  max_return<-min(max_return,article_cnt)
+  data<-data.frame(retrieve_ord=seq_len(max_return),
+                   title=unlist(title[seq_len(max_return)]),
+                   author=unlist(author[seq_len(max_return)]),
+                   journal=unlist(journal[seq_len(max_return)]),
+                   date=unlist(date[seq_len(max_return)]),
+                   abstract=unlist(abstract),
+                   cite_by=unlist(cite_by[seq_len(max_return)]),
+                   # cite_wos=cite_wos,
+                   link=unlist(link[seq_len(max_return)]),
+                   domain=unlist(domain[seq_len(max_return)]),
+                   stringsAsFactors = F)
+  
   metadata<-data.frame(query=keywd,
-                       engine="pubmed",
+                       engine="scopus",
                        search_result=article_cnt,
                        sort_by="relevance")
   
@@ -277,6 +272,10 @@ get_pubmed_full<-function(query,max_return=20) {
   return(out)
 }
 
+
+get_web_of_science_full<-function(){
+  
+}
 
 get_google_scholar_full<-function(query,page=1){
   #sleep before start

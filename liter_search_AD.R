@@ -15,11 +15,11 @@ require_libraries(c("rentrez",
                     "ggplot2",
                     "ggrepel"))
 
-AD_syn<-c("alzheimer","AD")
+AD_syn<-c("alzheimer")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("machine learning","feature selection",
-           "learning","algorithm","analytics",
+Alg_syn<-c("predictive","machine learning","feature selection",
+           "algorithm","analytics","multivariate",
            "big data","large data","high-dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
@@ -27,67 +27,154 @@ query_grid<-expand.grid(key1=AD_syn,
                         stringsAsFactors = F) %>%
   mutate(query_key=paste0(key1," AND ", key2))
 
-liter_rel<-list()
 
+#pubmed
+liter_data<-c()
+liter_meta<-c()
 for(i in seq_len(nrow(query_grid))){
   query<-query_grid$query_key[i]
-
   start_i<-Sys.time()
 
-  # Cochrane Library--TODO
-  # liter_cochrane<-get_cochrane_full(query,max_return=200)
+  liter<-get_pubmed_full(query,max_return=200)
 
-  # Pubmed
-  liter_pubmed<-get_pubmed_full(query,max_return=100)
-
-  # scopus
-  api_key<-"311c8c86fe53aba1e2107584fc41e390"
-  liter_scopus<-get_scopus_full(api_type="scopus",query,max_return=100,api_key)
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
   
-  # science direct
-  api_key<-"311c8c86fe53aba1e2107584fc41e390"
-  liter_scopus<-get_scopus_full(api_type="sciencedirect",query,max_return=100,api_key)
-
-  # web of science -- TODO
-  
-  
-  # WorldCat -- TODO
-  
-  
-  # WHO -- TODO
-  
-  
-  # Grey Literature -- TODO
-  
-  
-  # stack all
-  liter_data<-liter_google$data %<>% mutate(engine="google scholar")
-    bind_rows(liter_pubmed$data %>% mutate(engine="pubmed"))
-  
-  liter_meta<-liter_google$metadata %<>%
-    bind_rows(liter_pubmed$metadata)
-  
-  if(nrow(liter) > 0){
+  if(nrow(liter_data_i) > 0){
     #clean-up: contain target word group I?
-    liter_data %<>%
+    liter_data_i %<>%
       mutate(title2=title,abstract2=abstract) %>%
       unite("title_abstr",c("title2","abstract2")) %>%
       filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
 
     #clean-up: contain target word group II?
-    liter_data %<>%
+    liter_data_i %<>%
       filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
       dplyr::select(-title_abstr)
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
   }
-
-  liter_rel[[query_grid$query_key[i]]]<-list(liter_data=liter_data,
-                                             liter_meta=liter_meta)
 
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
   
   Sys.sleep(15)
 }
+liter_pubmed<-list(liter_data=liter_data,
+                   liter_meta=liter_meta)
+
+saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
+
+
+# scopus
+for(i in seq_len(nrow(query_grid))){
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  api_key<-"311c8c86fe53aba1e2107584fc41e390"
+  
+  # scrape
+  liter_scopus<-get_scopus_full(api_type="scopus",query,max_return=100,api_key)
+  liter_sciencedirect<-get_scopus_full(api_type="sciencedirect",query,max_return=100,api_key)
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+  
+  Sys.sleep(15)
+}
+
+
+
+# cochrane
+for(i in seq_len(nrow(query_grid))){
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # Cochrane Library--TODO
+  # liter_cochrane<-get_cochrane_full(query,max_return=200)
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+  
+  Sys.sleep(15)
+}
+
+# web of science
+for(i in seq_len(nrow(query_grid))){
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # web of science -- TODO
+  
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+  
+  Sys.sleep(15)
+}
+
+
 
 
 # special treatment for google scholar search
