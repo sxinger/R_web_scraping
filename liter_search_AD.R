@@ -26,9 +26,20 @@ query_grid<-expand.grid(key1=AD_syn,
                         stringsAsFactors = F) %>%
   mutate(query_key=paste0(key1," AND ", key2))
 
-
 ##==============pubmed===========
-require_libraries("rentrez")
+require_libraries("rentrez","tm")
+stopwords_regex<-paste0('\\b',
+                        paste(stopwords('en'), collapse = '\\b|\\b'),
+                        '\\b')
+query_item<-c("&as_epq=",
+              "&as_oq=",
+              "&as_eq=",
+              "&as_occt=any",
+              "&as_sauthors=",
+              "&as_publication=",
+              "&as_yhi=",
+              "&hl=en&as_sdt=0%2C5")
+
 liter_data<-c()
 liter_meta<-c()
 for(i in seq_len(nrow(query_grid))){
@@ -57,30 +68,29 @@ for(i in seq_len(nrow(query_grid))){
     
     #collect filtered results
     filter_cnt<-nrow(liter_data_i)
-    metadata<-liter$metadata %>%
-      mutate(filter_cnt=filter_cnt)
-    liter$metadata<-metadata
-    
-    #collect citations from google scholar
-    for(q in seq_len(nrow(liter_data_i))){
-      start_q<-Sys.time()
-      
-      title<-liter_data_i$title[q]
-      cite_q<-get_google_scholar_citation(title)
-      cite<-c(cite,cite_q)
-      
-      lapse_q<-Sys.time()-start_q
-      cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
-    }
-    liter_data_i %<>%
-      mutate(cited_by=cite) %>%
-      separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
-      dplyr::select(-cited_by)
-    
-    #stack results
-    liter_data %<>% bind_rows(liter_data_i)
-    liter_meta %<>% bind_rows(liter$metadata)
+    metadata<-liter$metadata %>% mutate(filter_cnt=filter_cnt)
   }
+  
+  #collect citations from google scholar
+  for(q in seq_len(nrow(liter_data_i))){
+    start_q<-Sys.time()
+    
+    title<-liter_data_i$title[q]
+    cite_q<-get_google_scholar_citation(title)
+    cite<-c(cite,cite_q)
+    
+    lapse_q<-Sys.time()-start_q
+    cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
+  }
+  
+  liter_data_i %<>%
+    mutate(cited_by=cite) %>%
+    separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
+    dplyr::select(-cited_by)
+  
+  #stack results
+  liter_data %<>% bind_rows(liter_data_i)
+  liter_meta %<>% bind_rows(metadata)
 
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
@@ -88,28 +98,6 @@ for(i in seq_len(nrow(query_grid))){
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
-
-
-##---google scholar search for citation---
-liter_pubmed<-readRDS("./data/pubmed_search_result.rda")
-data_raw<-liter_pubmed$liter_data
-cite<-c()
-for(q in seq_len(nrow(data_raw))){
-  start_q<-Sys.time()
-  
-  title<-data_raw$title[q]
-  cite_q<-get_google_scholar_citation(title)
-  cite<-c(cite,cite_q)
-  
-  lapse_q<-Sys.time()-start_q
-  cat("finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
-}
-
-data_raw %<>%
-  mutate(cited_by=cite) %>%
-  separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
-  dplyr::select(-cited_by)
-
 
 
 ##==============scopus=============

@@ -42,8 +42,23 @@ shuffle_agent<-function(){
   sample(agent_lst,1)
 }
 
+url_random<-function(title){
+  title<-str_replace_all(title,stopwords_regex,"")
+  query_obj<-strsplit(title," ")[[1]]
+  query_obj<-query_obj[query_obj!=""]
+  len_r<-sample(seq(min(3,length(query_obj)),length(query_obj)),1)
+  query<-paste(query_obj[1:len_r],collapse="+")
+  
+  yr_r<-sample(seq(1990,2009),1)
+  item_r<-paste(sample(query_item,5),collapse = "")
+  query_url<-paste("https://scholar.google.com/scholar?&as_q=",query,
+                  "&as_ylo=",yr_r,item_r,
+                   sep = "")
+  
+  return(query_url)
+}
+
 get_pubmed_full<-function(query,max_return=20) {
-  keywd<-query
   # formulate the query term
   query<-paste(query,"('2010/01/01'[PDat]:'3000/12/31'[PDat])") # date restriction
   query<-gsub("'", "%22", gsub(" ", "+", query))
@@ -89,12 +104,13 @@ get_pubmed_full<-function(query,max_return=20) {
                      grands=NA,
                      stringsAsFactors = F)
   }else{
-    chk_size<-50 # <=max_return; changable
-    chk_seq<-seq(1,min(max_return,article_cnt),by=chk_size)
+    chk_size<-50 # changable
+    chk_seq<-c(seq(1,min(max_return,article_cnt),by=chk_size),
+               min(max_return,article_cnt)+1)
     data<-c()
-    for(k in seq_along(chk_seq)){
+    for(k in seq_along(chk_seq[-1])){
       data_pubmed<-entrez_fetch(db = "pubmed",
-                                id = ids[chk_seq[k]:(chk_seq[k]+(chk_size-1))],
+                                id = ids[chk_seq[k]:(chk_seq[k+1]-1)],
                                 rettype = "xml",
                                 parsed = TRUE)
       #retrieve title
@@ -137,6 +153,31 @@ get_pubmed_full<-function(query,max_return=20) {
         val
       })
       
+      #retrieve mesh terms
+      mesh_term<-xpathSApply(data_pubmed, "//PubmedArticle//Article//ArticleTitle|//MeshHeadingList",xmlValue)
+      mesh_major<-xpathSApply(data_pubmed, "//MeshHeadingList", function(x) {
+        val <- xpathSApply(x, "./MeshHeading/DescriptorName[@MajorTopicYN='Y']", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      mesh_minor<-xpathSApply(data_pubmed, "//MeshHeadingList", function(x) {
+        val <- xpathSApply(x, "./MeshHeading/DescriptorName[@MajorTopicYN='N']", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      mesh_df<-data.frame(title_mesh=unlist(mesh_term)) %>%
+        mutate(rn=1:n()) %>%
+        mutate(title_or_mesh=ifelse(title_mesh %in% unlist(title),"title","mesh"),
+               rn=ifelse(title_mesh %in% unlist(title),rn,NA)) %>%
+        fill(rn,.direction="down") %>%
+        spread(title_or_mesh,title_mesh)
+      
+      mesh_df2<-mesh_df %>% filter(!is.na(mesh)) %>%
+        mutate(mesh_major=sapply(mesh_major,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";")))),
+               mesh_minor=sapply(mesh_minor,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))) %>%
+        bind_rows(mesh_df %>% filter(is.na(mesh)) %>% mutate(mesh_major=NA, mesh_minor=NA)) %>%
+        mutate(rn=rank(rn)) %>% arrange(rn)
+      
       #retrieve domain
       domain<-xpathSApply(data_pubmed, "//PubmedArticle", function(x) {
         val <- xpathSApply(x, "./MedlineCitation", xmlGetAttr,"Status")
@@ -169,15 +210,16 @@ get_pubmed_full<-function(query,max_return=20) {
                       paste0("www.ncbi.nlm.nih.gov/pubmed/",pubmed)))
       })
       
-      tot_retn<-length(title)
       data %<>%
-        bind_rows(data.frame(query=keywd,
-                             retrieve_ord=seq_len(tot_retn),
+        bind_rows(data.frame(retrieve_ord=seq(chk_seq[k],(chk_seq[k+1]-1)),
+                             pubmed_id=ids[chk_seq[k]:(chk_seq[k+1]-1)],
                              title=unlist(title),
                              author=unlist(author),
                              journal=unlist(journal),
                              date=unlist(paste(pub_yr,pub_mth,sep = "-")),
                              abstract=unlist(abstract),
+                             mesh_major=mesh_df2$mesh_major,
+                             mesh_minor=mesh_df2$mesh_minor,
                              link=link,
                              domain=domain,
                              grands=unlist(grands),
@@ -185,7 +227,6 @@ get_pubmed_full<-function(query,max_return=20) {
     }
   }
   metadata<-data.frame(engine="pubmed",
-                       query=keywd,
                        sort_by="relevance",
                        search_result=article_cnt,
                        stringsAsFactors = F)
@@ -321,14 +362,9 @@ get_google_scholar_citation<-function(title){
   #sleep before start
   brk_t<-sample(20:40,1)
   Sys.sleep(brk_t)
-  keywd<-query
-  
-  #url-friendly version
-  query<-gsub(" ","+",title)
-  query_url<-paste("https://scholar.google.com/scholar?&as_q=",query,
-                   "&as_epq=&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
-                   "&as_ylo=&as_yhi=&hl=en&as_sdt=0%2C5",
-                   sep = "")
+
+  #randomly generate url with different structure
+  query_url<-url_random(title)
   
   #parse xml
   # agent<-shuffle_agent()
