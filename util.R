@@ -45,6 +45,7 @@ shuffle_agent<-function(){
 get_pubmed_full<-function(query,max_return=20) {
   keywd<-query
   # formulate the query term
+  query<-paste(query,"('2010/01/01'[PDat]:'3000/12/31'[PDat])") # date restriction
   query<-gsub("'", "%22", gsub(" ", "+", query))
   query<-paste("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmax=",
                max_return,"&sort=relevance&term=", 
@@ -87,103 +88,106 @@ get_pubmed_full<-function(query,max_return=20) {
                      domain=NA,
                      grands=NA,
                      stringsAsFactors = F)
-    article_cnt2<-0
   }else{
-    data_pubmed<-entrez_fetch(db = "pubmed", id = ids, rettype = "xml",
-                              parsed = TRUE)
-    #retrieve title
-    title<-xpathApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./ArticleTitle", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    
-    #retrieve author
-    author_ln<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/LastName", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    author_fn<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/ForeName", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    author<-mapply(function(x,y) paste(unlist(x),unlist(y),sep=","),author_ln,author_fn)
-    author<-sapply(author, function(x) paste(unlist(x),collapse = ";"))
-    
-    #retrieve publication date
-    pub_yr<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
-      val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Year", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    pub_mth<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
-      val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Month", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
+    chk_size<-50 # <=max_return; changable
+    chk_seq<-seq(1,min(max_return,article_cnt),by=chk_size)
+    data<-c()
+    for(k in seq_along(chk_seq)){
+      data_pubmed<-entrez_fetch(db = "pubmed",
+                                id = ids[chk_seq[k]:(chk_seq[k]+(chk_size-1))],
+                                rettype = "xml",
+                                parsed = TRUE)
+      #retrieve title
+      title<-xpathApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./ArticleTitle", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
       
-    #retrieve journal
-    journal<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./Journal/Title", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    
-    #retrieve domain
-    domain<-xpathSApply(data_pubmed, "//PubmedArticle", function(x) {
-      val <- xpathSApply(x, "./MedlineCitation", xmlGetAttr,"Status")
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    
-    #retrieve grants
-    grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./GrantList[@CompleteYN='Y']/Grant/GrantID", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    grands<-lapply(grands,function(x) paste(unlist(x),collapse=","))
-    
-    #retrieve abstracts for the searched IDs
-    abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-      val <- xpathSApply(x, "./Abstract", xmlValue)
-      if (length(val)==0) val <- NA_character_
-      val
-    })
-    
-    #retrieve links
-    link<-xpathSApply(data_pubmed, "//PubmedData//ArticleIdList", function(x) {
-      doi <- xpathSApply(x, "./ArticleId[@IdType='doi']", xmlValue)
-      pmc <- xpathSApply(x, "./ArticleId[@IdType='pmc']", xmlValue)
-      pubmed <- xpathSApply(x, "./ArticleId[@IdType='pubmed']", xmlValue)
-      ifelse(length(doi)!=0,paste0("//doi.org/",doi),
-             ifelse(length(pmc)!=0,paste0("//pmc/articles/",pmc),
-                    paste0("www.ncbi.nlm.nih.gov/pubmed/",pubmed)))
-    })
-    
-  tot_retn<-length(title)
-  data<-data.frame(query=keywd,
-                   retrieve_ord=seq_len(tot_retn),
-                   title=unlist(title),
-                   author=unlist(author),
-                   journal=unlist(journal),
-                   date=unlist(paste(pub_yr,pub_mth,sep = "-")),
-                   abstract=unlist(abstract),
-                   link=link,
-                   domain=domain,
-                   grands=unlist(grands),
-                   stringsAsFactors = F)
-  
-  article_cnt2<-nrow(data)
+      #retrieve author
+      author_ln<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/LastName", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      author_fn<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/ForeName", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      author<-mapply(function(x,y) paste(unlist(x),unlist(y),sep=","),author_ln,author_fn)
+      author<-sapply(author, function(x) paste(unlist(x),collapse = ";"))
+      
+      #retrieve publication date
+      pub_yr<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
+        val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Year", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      pub_mth<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
+        val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Month", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      
+      #retrieve journal
+      journal<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./Journal/Title", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      
+      #retrieve domain
+      domain<-xpathSApply(data_pubmed, "//PubmedArticle", function(x) {
+        val <- xpathSApply(x, "./MedlineCitation", xmlGetAttr,"Status")
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      
+      #retrieve grants
+      grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./GrantList[@CompleteYN='Y']/Grant/GrantID", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      grands<-lapply(grands,function(x) paste(unlist(x),collapse=","))
+      
+      #retrieve abstracts for the searched IDs
+      abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+        val <- xpathSApply(x, "./Abstract", xmlValue)
+        if (length(val)==0) val <- NA_character_
+        val
+      })
+      
+      #retrieve links
+      link<-xpathSApply(data_pubmed, "//PubmedData//ArticleIdList", function(x) {
+        doi <- xpathSApply(x, "./ArticleId[@IdType='doi']", xmlValue)
+        pmc <- xpathSApply(x, "./ArticleId[@IdType='pmc']", xmlValue)
+        pubmed <- xpathSApply(x, "./ArticleId[@IdType='pubmed']", xmlValue)
+        ifelse(length(doi)!=0,paste0("//doi.org/",doi),
+               ifelse(length(pmc)!=0,paste0("//pmc/articles/",pmc),
+                      paste0("www.ncbi.nlm.nih.gov/pubmed/",pubmed)))
+      })
+      
+      tot_retn<-length(title)
+      data %<>%
+        bind_rows(data.frame(query=keywd,
+                             retrieve_ord=seq_len(tot_retn),
+                             title=unlist(title),
+                             author=unlist(author),
+                             journal=unlist(journal),
+                             date=unlist(paste(pub_yr,pub_mth,sep = "-")),
+                             abstract=unlist(abstract),
+                             link=link,
+                             domain=domain,
+                             grands=unlist(grands),
+                             stringsAsFactors = F))
+    }
   }
-  
   metadata<-data.frame(engine="pubmed",
                        query=keywd,
                        sort_by="relevance",
                        search_result=article_cnt,
-                       filter_result=article_cnt2,
                        stringsAsFactors = F)
   out<-list(data=data,metadata=metadata)
   return(out)
@@ -191,28 +195,34 @@ get_pubmed_full<-function(query,max_return=20) {
 
 
 
-get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=20,api_key){
+get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=2000,count=10,api_key,verb=T){
   keywd<-query
   api_key<-get_api_key(api_key)
-  
+  api_key<-"311c8c86fe53aba1e2107584fc41e390"
   # search scopus
+  start<-Sys.time()
   if(api_type=="scopus"){
     scopus_obj<-scopus_search(query=query,
                               api_key=api_key,
-                              count=20,
+                              count=count,
                               view="STANDARD",
                               sort="relevancy",
-                              verbose=F)
+                              verbose=T)
   }else{
     scopus_obj<-sciencedirect_search(query=query,
                                      api_key=api_key,
-                                     count=20,
+                                     count=count,
                                      view="STANDARD",
                                      sort="relevancy",
                                      verbose=F)
   }
+  if(verb){
+    lapse<-Sys.time()-start
+    cat("finish search scopus/science_direct in",lapse,units(lapse),".\n")
+  }
   
   
+  start<-Sys.time()
   # retrieve search result
   article_cnt<-scopus_obj$total_results
   
@@ -239,26 +249,44 @@ get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=
   
   # retrieve domain
   domain<-sapply(scopus_obj$entries, function(x) x$`prism:aggregationType`)
-  
-  # retrieve abstract
-  abstract<-c()
-  for(idi in id[seq_len(max_return)]){
-    get_abstr<-abstract_retrieval(idi,"scopus_id",api_key=api_key)
-    get_raw<-paste0(sapply(get_abstr$get_statement$content,function(h) rawToChar(as.raw(strtoi(h, 16L)))),collapse = "")
-    abstract<-c(abstract,paste(, collapse=" "))
+  if(verb){
+    lapse<-Sys.time()-start
+    cat("finish retrieve info (except abstract) in",lapse,units(lapse),".\n")
   }
   
-  a<-abstract_retrieval(id[1],"scopus_id",api_key=api_key)
-  
+  start<-Sys.time()
+  # retrieve abstract
   max_return<-min(max_return,article_cnt)
+  abstract<-c()
+  for(idi in id[seq_len(max_return)]){
+    brk_t<-sample(10:30,1)
+    Sys.sleep(brk_t)
+    
+    get_abstr<-abstract_retrieval(idi,"scopus_id",api_key=api_key)
+    redirect_link<-get_abstr$content$`abstracts-retrieval-response`$coredata$link
+    redirect_link<-sapply(redirect_link, function(x) ifelse(x$`@rel`=="scopus",x$`@href`,NA))
+    redirect_link<-redirect_link[!is.na(redirect_link)]
+    if(length(redirect_link)>1){
+      get_link<-GET(redirect_link[1])
+      doc<-htmlParse(get_link, encoding="UTF-8", useInternal = TRUE)
+      abstract_idi<-xpathSApply(doc,"//html//body//section[@id='abstractSection']//p",xmlValue)
+    }else{
+      abstract_idi<-NA
+    }
+    abstract<-c(abstract,abstract_idi)
+  }
+  if(verb){
+    lapse<-Sys.time()-start
+    cat("finish retrieve abstract in",lapse,units(lapse),".\n")
+  }
+  
   data<-data.frame(retrieve_ord=seq_len(max_return),
                    title=unlist(title[seq_len(max_return)]),
                    author=unlist(author[seq_len(max_return)]),
                    journal=unlist(journal[seq_len(max_return)]),
                    date=unlist(date[seq_len(max_return)]),
-                   abstract=unlist(abstract),
+                   abstract=abstract,
                    cite_by=unlist(cite_by[seq_len(max_return)]),
-                   # cite_wos=cite_wos,
                    link=unlist(link[seq_len(max_return)]),
                    domain=unlist(domain[seq_len(max_return)]),
                    stringsAsFactors = F)
@@ -273,13 +301,25 @@ get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=
 }
 
 
-get_web_of_science_full<-function(){
-  
-}
+# get_web_of_science_full<-function(){
+#   
+# }
+
+# get_worldcat_full<-function(){
+#   
+# }
+
+# get_who_full<-function(){
+#   
+# }
+
+# get_greyliter_full<-function(){
+#   
+# }
 
 get_google_scholar_full<-function(query,page=1){
   #sleep before start
-  brk_t<-sample(10:30,1)
+  brk_t<-sample(30:60,1)
   Sys.sleep(brk_t)
   keywd<-query
   
@@ -301,21 +341,22 @@ get_google_scholar_full<-function(query,page=1){
   query_url<-paste("https://scholar.google.com/scholar?start=",(page-1)*10,
                    "&as_q=",wd,"&as_epq=",phr,
                    "&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
-                   "&as_ylo=2000&as_yhi=&hl=en&as_sdt=0%2C5",
+                   "&as_ylo=2010&as_yhi=&hl=en&as_sdt=0%2C5",
                    sep = "")
   
   #parse xml
-  get_url<-getURL(query_url,.opts=list(useragent=agent,followlocation=TRUE))
+  # agent<-shuffle_agent()
+  get_url<-getURL(query_url)
   query<-htmlParse(get_url,encoding="UTF-8")
   
-  if(i==1){
-    #retrieve number of related articles
-    result<-xpathSApply(query,"//html//body//div[@class='gs_ab_mdw']",xmlValue)
-    article_cnt<-as.numeric(gsub(",","",str_match(result[2],"(About )(.*?)( results)")[,3]))
-  }
+  #retrieve number of related articles
+  result<-xpathSApply(query,"//html//body//div[@class='gs_ab_mdw']",xmlValue)
+  article_cnt<-as.numeric(gsub(",","",str_match(result[2],"(About )(.*?)( results)")[,3]))
   
   #retrieve title
+  title_full<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//h3",xmlValue)
   title<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//h3//a",xmlValue)
+  active_link<-!grepl("(\\[CITATION\\])+",title_full)
   
   #retrieve author, date, journal
   author_dt_journal<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_a']",xmlValue)
@@ -324,28 +365,28 @@ get_google_scholar_full<-function(query,page=1){
   link<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//h3//a[@data-clk!='undefined']",xmlGetAttr,"href")
   
   #retrieve abstract
-  abstract<-lapply(xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_rs']",xmlValue),
+  author_abstr<-lapply(xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[contains(@class,'gs_a') or contains(@class,'gs_rs')]",xmlValue),
                    function(x) gsub("\\n"," ",x))
+  abstr_align<-data.frame(author_abstr=unlist(author_abstr),stringsAsFactors = F) %>%
+    mutate(rn=1:n()) %>%
+    mutate(author_or_abstract=case_when((author_abstr %in% unlist(author_dt_journal)) ~ "author",
+                                        !(author_abstr %in% unlist(author_dt_journal)) ~ "abstract")) %>%
+    mutate(rn=ifelse(author_or_abstract=="author",rn,NA)) %>%
+    fill(rn,.direction="down") %>%
+    spread(author_or_abstract,author_abstr) %>%
+    arrange(rn)
   
   #retrieve citation
-  cite<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']//a//text()",xmlValue)
-  cite<-data.frame(cite_src=unlist(cite)[unlist(sapply(cite,function(x) grepl("((Cited by)|(Web of Science))+",x)))],
-                   stringsAsFactors = F) %>%
-    mutate(cite_type=str_extract(cite_src,"((Cited by)|(Web of Science))+"),
-           cite_val=as.numeric(gsub("((Cited by )|(Web of Science: ))+","",cite_src)),
-           rn=ifelse(cite_type=="Cited by",1:n(),NA)) %>%
-    fill(rn,.direction="down") %>% ungroup %>%
-    dplyr::select(rn,cite_type,cite_val) %>%
-    spread(cite_type,cite_val)
+  cite<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']//a[contains(.,'Cited by')]//text()",xmlValue)
+  cite<-sapply(cite,function(x) as.numeric(gsub("(Cited by )","",x)))
   
   data<-data.frame(
-    retrieve_ord=seq(10*(i-1)+1,10*i),
-    title=unlist(title),
-    author_dt_journal=unlist(author_dt_journal),
-    cite_gs = cite$`Cited by`,
-    cite_wos = cite$`Web of Science`,
-    abstract=unlist(abstract),
-    link=unlist(link),
+    retrieve_ord=seq(10*(page-1)+1,10*page)[active_link],
+    title=unlist(title)[active_link],
+    author_dt_journal=unlist(author_dt_journal)[active_link],
+    cite_by = unlist(cite)[active_link],
+    abstract=abstr_align$abstract[active_link],
+    link=unlist(link)[active_link],
     stringsAsFactors = FALSE) %>%
     mutate(author_dt_journal=gsub("<U+00A0>","",author_dt_journal)) %>%
     separate(author_dt_journal,c("author","journal_date","domain"),"- ",
@@ -353,7 +394,7 @@ get_google_scholar_full<-function(query,page=1){
     separate(journal_date,c("journal","date"),", ",
              extra = "merge",fill="left") %>% 
     dplyr::select(retrieve_ord,title,author,journal,date,
-                  abstract,cite_gs,cite_wos,link,domain)
+                  abstract,cite_by,link,domain)
   
   metadata<-data.frame(query=keywd,
                        engine="google scholar",
@@ -361,7 +402,7 @@ get_google_scholar_full<-function(query,page=1){
                        sort_by="relevance",
                        stringsAsFactors = F)
   
-  out<-list(data=data,metadata=metadata)
+  out<-list(data=data,metadata=metadata,url=query_url)
   return(out)
 }
 

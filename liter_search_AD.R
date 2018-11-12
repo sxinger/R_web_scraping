@@ -4,9 +4,7 @@ gc()
 
 # trace(utils:::unpackPkgZip, edit=TRUE)
 source("./util.R")
-require_libraries(c("rentrez",
-                    "rscopus",
-                    "XML",
+require_libraries(c("XML",
                     "RCurl",
                     "stringr",
                     "dplyr",
@@ -18,8 +16,9 @@ require_libraries(c("rentrez",
 AD_syn<-c("alzheimer")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("predictive","machine learning","feature selection",
-           "algorithm","analytics","multivariate",
+Alg_syn<-c("predictive","machine learning",
+           "algorithm","analytics",
+           "multivariate","feature selection",
            "big data","large data","high-dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
@@ -28,14 +27,18 @@ query_grid<-expand.grid(key1=AD_syn,
   mutate(query_key=paste0(key1," AND ", key2))
 
 
-#pubmed
+##==============pubmed===========
+require_libraries("rentrez")
 liter_data<-c()
 liter_meta<-c()
 for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
   query<-query_grid$query_key[i]
   start_i<-Sys.time()
 
-  liter<-get_pubmed_full(query,max_return=200)
+  liter<-get_pubmed_full(query,max_return=5000)
 
   #post-filter
   liter_data_i<-liter$data %>% mutate(keywd=query)
@@ -52,31 +55,95 @@ for(i in seq_len(nrow(query_grid))){
       filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
       dplyr::select(-title_abstr)
     
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
     #stack results
     liter_data %<>% bind_rows(liter_data_i)
-    liter_meta %<>% bind_rows(liter$meta)
+    liter_meta %<>% bind_rows(liter$metadata)
   }
 
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
-  
-  Sys.sleep(15)
 }
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
-
 saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
 
 
-# scopus
+##==============scopus=============
+require_libraries("rscopus")
+liter_data<-c()
+liter_meta<-c()
 for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
   query<-query_grid$query_key[i]
   start_i<-Sys.time()
-  api_key<-"311c8c86fe53aba1e2107584fc41e390"
   
   # scrape
-  liter_scopus<-get_scopus_full(api_type="scopus",query,max_return=100,api_key)
-  liter_sciencedirect<-get_scopus_full(api_type="sciencedirect",query,max_return=100,api_key)
+  api_key<-"b2c86c0a2013c7a788198cd75369672d"
+  liter<-get_scopus_full(api_type="scopus",
+                         query=query,
+                         max_return=2000,
+                         count=25,
+                         api_key=api_key)
+
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+}
+liter_scopus<-list(liter_data=liter_data,
+                   liter_meta=liter_meta)
+saveRDS(liter_scopus,file="./data/scopus_search_result.rda")
+
+
+##==============science direct===============
+require_libraries("rscopus")
+liter_data<-c()
+liter_meta<-c()
+for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # scrape
+  api_key<-"3ccb1529e4db2c490e19e0abe1e95da9"
+  liter<-get_scopus_full(api_type="sciencedirect",
+                         query=query,
+                         max_return=2000,
+                         count=25,
+                         api_key=api_key)
   
   #post-filter
   liter_data_i<-liter$data %>% mutate(keywd=query)
@@ -93,21 +160,29 @@ for(i in seq_len(nrow(query_grid))){
       filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
       dplyr::select(-title_abstr)
     
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
     #stack results
     liter_data %<>% bind_rows(liter_data_i)
     liter_meta %<>% bind_rows(liter$meta)
   }
-  
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
-  
-  Sys.sleep(15)
 }
+liter_scidirect<-list(liter_data=liter_data,
+                   liter_meta=liter_meta)
+saveRDS(liter_scidirect,file="./data/scidirect_search_result.rda")
 
 
-
-# cochrane
+##==============cochrane=============
 for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
   query<-query_grid$query_key[i]
   start_i<-Sys.time()
   
@@ -129,6 +204,12 @@ for(i in seq_len(nrow(query_grid))){
       filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
       dplyr::select(-title_abstr)
     
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
     #stack results
     liter_data %<>% bind_rows(liter_data_i)
     liter_meta %<>% bind_rows(liter$meta)
@@ -136,17 +217,18 @@ for(i in seq_len(nrow(query_grid))){
   
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
-  
-  Sys.sleep(15)
 }
 
-# web of science
+
+##==============web of science===================
 for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
   query<-query_grid$query_key[i]
   start_i<-Sys.time()
   
   # web of science -- TODO
-  
   
   #post-filter
   liter_data_i<-liter$data %>% mutate(keywd=query)
@@ -163,6 +245,12 @@ for(i in seq_len(nrow(query_grid))){
       filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
       dplyr::select(-title_abstr)
     
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
     #stack results
     liter_data %<>% bind_rows(liter_data_i)
     liter_meta %<>% bind_rows(liter$meta)
@@ -170,48 +258,172 @@ for(i in seq_len(nrow(query_grid))){
   
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
-  
-  Sys.sleep(15)
 }
 
 
-
-
-# special treatment for google scholar search
-i<-1 #...1
-query<-query_grid$query_key[i]
+##==============worldcat===================
+for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # worldCat -- TODO
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+}
+##==============world health organization===================
+for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # world health organization -- TODO
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+}
+##==============grey literature===================
+for(i in seq_len(nrow(query_grid))){
+  brk_t<-sample(10:30,1)
+  Sys.sleep(brk_t)
+  
+  query<-query_grid$query_key[i]
+  start_i<-Sys.time()
+  
+  # grey literature -- TODO
+  
+  #post-filter
+  liter_data_i<-liter$data %>% mutate(keywd=query)
+  
+  if(nrow(liter_data_i) > 0){
+    #clean-up: contain target word group I?
+    liter_data_i %<>%
+      mutate(title2=title,abstract2=abstract) %>%
+      unite("title_abstr",c("title2","abstract2")) %>%
+      filter(grepl(query_grid$key1[i],title_abstr,ignore.case = T))
+    
+    #clean-up: contain target word group II?
+    liter_data_i %<>%
+      filter(grepl(query_grid$key2[i],title_abstr,ignore.case = T)) %>%
+      dplyr::select(-title_abstr)
+    
+    #collect filtered results
+    filter_cnt<-nrow(liter_data_i)
+    metadata<-liter$metadata %>%
+      mutate(filter_cnt=filter_cnt)
+    liter$metadata<-metadata
+    
+    #stack results
+    liter_data %<>% bind_rows(liter_data_i)
+    liter_meta %<>% bind_rows(liter$meta)
+  }
+  
+  lapse_i<-Sys.time()-start_i
+  cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
+}
+##==============special treatment for google scholar search==============
+q<-1 #...1
+query<-query_grid$query_key[q]
 
 data<-c()
+
+b<-3 #...2
 # page 1
-liter_google<-get_google_scholar_full(query,page=1)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+1)
 data %<>% bind_rows(liter_google$data)
 metadata<-bind_rows(liter_google$metadata)
+
 # page 2
-liter_google<-get_google_scholar_full(query,page=2)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+2)
 data %<>% bind_rows(liter_google$data)
+
 # page 3
-liter_google<-get_google_scholar_full(query,page=3)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+3)
 data %<>% bind_rows(liter_google$data)
+
 # page 4
-liter_google<-get_google_scholar_full(query,page=4)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+4)
 data %<>% bind_rows(liter_google$data)
+
 # page 5
-liter_google<-get_google_scholar_full(query,page=5)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+5)
 data %<>% bind_rows(liter_google$data)
+
 # page 6
-liter_google<-get_google_scholar_full(query,page=6)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+6)
 data %<>% bind_rows(liter_google$data)
+
 # page 7
-liter_google<-get_google_scholar_full(query,page=7)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+7)
 data %<>% bind_rows(liter_google$data)
+
 # page 8
-liter_google<-get_google_scholar_full(query,page=8)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+8)
 data %<>% bind_rows(liter_google$data)
+
 # page 9
-liter_google<-get_google_scholar_full(query,page=9)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+9)
 data %<>% bind_rows(liter_google$data)
+
 # page 10
-liter_google<-get_google_scholar_full(query,page=10)
+liter_google<-get_google_scholar_full(query,page=10*(b-1)+10)
 data %<>% bind_rows(liter_google$data)
 
 
