@@ -217,8 +217,8 @@ get_pubmed_full<-function(query,max_return=20) {
       })
       
       data %<>%
-        bind_rows(data.frame(retrieve_ord=seq(chk_seq[k],(chk_seq[k+1]-1))[seq_along(pubmed_ids)],
-                             pubmed_id=pubmed_ids,
+        bind_rows(data.frame(retrieve_ord=seq(chk_seq[k],(chk_seq[k+1]-1)),
+                             pubmed_id=ids[chk_seq[k]:(chk_seq[k+1]-1)],
                              title=unlist(title),
                              author=unlist(author),
                              journal=unlist(journal),
