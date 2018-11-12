@@ -379,51 +379,31 @@ for(i in seq_len(nrow(query_grid))){
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
 }
 ##==============special treatment for google scholar search==============
+data<-c()
+metadata<-c()
+
 q<-1 #...1
 query<-query_grid$query_key[q]
 
-data<-c()
-
-b<-3 #...2
 # page 1
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+1)
+liter_google<-get_google_scholar_full(query,page=1)
 data %<>% bind_rows(liter_google$data)
-metadata<-bind_rows(liter_google$metadata)
+metadata %<>% bind_rows(liter_google$metadata)
 
-# page 2
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+2)
-data %<>% bind_rows(liter_google$data)
+pg_n<-ceiling(metadata$search_result[nrow(metadata)]/10)
+chk_size<-5
+chk_seq<-c(seq(2,pg_n,by=chk_size),max(pg_n))
+pg_chk<-ceiling(pg_n/chk_size)
 
-# page 3
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+3)
-data %<>% bind_rows(liter_google$data)
-
-# page 4
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+4)
-data %<>% bind_rows(liter_google$data)
-
-# page 5
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+5)
-data %<>% bind_rows(liter_google$data)
-
-# page 6
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+6)
-data %<>% bind_rows(liter_google$data)
-
-# page 7
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+7)
-data %<>% bind_rows(liter_google$data)
-
-# page 8
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+8)
-data %<>% bind_rows(liter_google$data)
-
-# page 9
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+9)
-data %<>% bind_rows(liter_google$data)
-
-# page 10
-liter_google<-get_google_scholar_full(query,page=10*(b-1)+10)
-data %<>% bind_rows(liter_google$data)
-
-
+for(b in 5:pg_chk){
+  start_b<-Sys.time()
+  Sys.sleep(20)
+  
+  for(p in chk_seq[b]:chk_seq[b+1]){
+    liter_google<-get_google_scholar_full(query,page=p)
+    data %<>% bind_rows(liter_google$data) 
+  }
+  
+  lapse_b<-Sys.time()-start_b
+  cat("finish batch",b,"(",chk_size,"pages per chunk) in",lapse_b,units(lapse_b),".\n")
+}
