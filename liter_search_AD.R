@@ -73,6 +73,8 @@ liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
 
+liter_pubmed<-readRDS("./data/pubmed_search_result.rda")
+liter_pubmed$liter_meta %>% View
 
 ##==============scopus=============
 require_libraries("rscopus")
@@ -382,28 +384,30 @@ for(i in seq_len(nrow(query_grid))){
 data<-c()
 metadata<-c()
 
-q<-1 #...1
-query<-query_grid$query_key[q]
-
-# page 1
-liter_google<-get_google_scholar_full(query,page=1)
-data %<>% bind_rows(liter_google$data)
-metadata %<>% bind_rows(liter_google$metadata)
-
-pg_n<-ceiling(metadata$search_result[nrow(metadata)]/10)
-chk_size<-5
-chk_seq<-c(seq(2,pg_n,by=chk_size),max(pg_n))
-pg_chk<-ceiling(pg_n/chk_size)
-
-for(b in 5:pg_chk){
-  start_b<-Sys.time()
-  Sys.sleep(20)
+for(q in seq_len(nrow(query_grid))){
+  query<-query_grid$query_key[q]
   
-  for(p in chk_seq[b]:chk_seq[b+1]){
-    liter_google<-get_google_scholar_full(query,page=p)
-    data %<>% bind_rows(liter_google$data) 
+  # page 1
+  liter_google<-get_google_scholar_full(query,page=1)
+  data %<>% bind_rows(liter_google$data)
+  metadata %<>% bind_rows(liter_google$metadata)
+  
+  pg_n<-ceiling(metadata$search_result[nrow(metadata)]/10)
+  chk_size<-5
+  chk_seq<-c(seq(2,pg_n,by=chk_size),max(pg_n))
+  pg_chk<-ceiling(pg_n/chk_size)
+  
+  for(b in 2:pg_chk){
+    start_b<-Sys.time()
+    Sys.sleep(20)
+    
+    for(p in chk_seq[b]:chk_seq[b+1]){
+      liter_google<-get_google_scholar_full(query,page=p)
+      data %<>% bind_rows(liter_google$data) 
+    }
+    
+    lapse_b<-Sys.time()-start_b
+    cat("finish batch",b,"(",chk_size,"pages per batch) in",lapse_b,units(lapse_b),".\n")
   }
-  
-  lapse_b<-Sys.time()-start_b
-  cat("finish batch",b,"(",chk_size,"pages per chunk) in",lapse_b,units(lapse_b),".\n")
 }
+

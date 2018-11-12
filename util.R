@@ -377,16 +377,21 @@ get_google_scholar_full<-function(query,page=1){
     arrange(rn)
   
   #retrieve citation
-  cite<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']//a[contains(.,'Cited by')]//text()",xmlValue)
-  cite<-sapply(cite,function(x) as.numeric(gsub("(Cited by )","",x)))
+  cite<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']",xmlValue)
+  cite_df<-data.frame(gs_fl=unlist(cite)) %>%
+    mutate(cited_by=as.numeric(gsub("Cited by ","",str_extract(cite,"(Cited by [[1-9]]+)+"))),
+           cited_wos=as.numeric(gsub("Web of Science: ","",str_extract(cite,"(Web of Science: [[1-9]]+)+")))) %>%
+    mutate(cited_by2=cited_by,cited_wos2=cited_wos) %>%
+    unite("cited_str",c("cited_by2","cited_wos2"),sep=",")
   
+  actlink_cite<-active_link&(!is.na(cite_df$cited_by))
   data<-data.frame(
-    retrieve_ord=seq(10*(page-1)+1,10*page)[active_link],
-    title=unlist(title)[active_link],
-    author_dt_journal=unlist(author_dt_journal)[active_link],
-    cite_by = unlist(cite)[active_link],
-    abstract=abstr_align$abstract[active_link],
-    link=unlist(link)[active_link],
+    retrieve_ord=seq(10*(page-1)+1,10*page)[actlink_cite],
+    title=unlist(title)[actlink_cite],
+    author_dt_journal=unlist(author_dt_journal)[actlink_cite],
+    cite_by = cite_df$cited_str[actlink_cite],
+    abstract=abstr_align$abstract[actlink_cite],
+    link=unlist(link)[actlink_cite],
     stringsAsFactors = FALSE) %>%
     mutate(author_dt_journal=gsub("<U+00A0>","",author_dt_journal)) %>%
     separate(author_dt_journal,c("author","journal_date","domain"),"- ",
