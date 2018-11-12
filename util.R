@@ -113,20 +113,20 @@ get_pubmed_full<-function(query,max_return=20) {
                                 id = ids[chk_seq[k]:(chk_seq[k+1]-1)],
                                 rettype = "xml",
                                 parsed = TRUE)
+      
       #retrieve title
-      title<-xpathApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-        val <- xpathSApply(x, "./ArticleTitle", xmlValue)
-        if (length(val)==0) val <- NA_character_
-        val
-      })
+      title<-xpathSApply(data_pubmed,
+                        "//PubmedArticle//Article//ArticleTitle|
+                         //PubmedBookArticle//ArticleTitle",
+                        xmlValue)
       
       #retrieve author
-      author_ln<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+      author_ln<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
         val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/LastName", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
       })
-      author_fn<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+      author_fn<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
         val <- xpathSApply(x, "./AuthorList[@CompleteYN='Y']/Author[@ValidYN='Y']/ForeName", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
@@ -135,26 +135,25 @@ get_pubmed_full<-function(query,max_return=20) {
       author<-sapply(author, function(x) paste(unlist(x),collapse = ";"))
       
       #retrieve publication date
-      pub_yr<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
+      pub_yr<-xpathSApply(data_pubmed, "//PubmedData//History|//PubmedBookData//History", function(x) {
         val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Year", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
       })
-      pub_mth<-xpathSApply(data_pubmed, "//PubmedData//History", function(x) {
+      pub_mth<-xpathSApply(data_pubmed, "//PubmedData//History|//PubmedBookData//History", function(x) {
         val <- xpathSApply(x, "./PubMedPubDate[@PubStatus='pubmed']/Month", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
       })
       
       #retrieve journal
-      journal<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
-        val <- xpathSApply(x, "./Journal/Title", xmlValue)
-        if (length(val)==0) val <- NA_character_
-        val
-      })
+      journal<-xpathSApply(data_pubmed, "//PubmedArticle//Article//Journal//Title|
+                                         //PubmedBookArticle//Book//BookTitle",
+                           xmlValue)
       
       #retrieve mesh terms
-      mesh_term<-xpathSApply(data_pubmed, "//PubmedArticle//Article//ArticleTitle|//MeshHeadingList",xmlValue)
+      mesh_term<-xpathSApply(data_pubmed, "//PubmedArticle//Article//ArticleTitle|//PubmedBookArticle//ArticleTitle|
+                                           //MeshHeadingList",xmlValue)
       mesh_major<-xpathSApply(data_pubmed, "//MeshHeadingList", function(x) {
         val <- xpathSApply(x, "./MeshHeading/DescriptorName[@MajorTopicYN='Y']", xmlValue)
         if (length(val)==0) val <- NA_character_
@@ -165,11 +164,18 @@ get_pubmed_full<-function(query,max_return=20) {
         if (length(val)==0) val <- NA_character_
         val
       })
-      mesh_df<-data.frame(title_mesh=unlist(mesh_term)) %>%
+      mesh_df<-data.frame(title_mesh=unlist(mesh_term),stringsAsFactors = F) %>%
         mutate(rn=1:n()) %>%
         mutate(title_or_mesh=ifelse(title_mesh %in% unlist(title),"title","mesh"),
                rn=ifelse(title_mesh %in% unlist(title),rn,NA)) %>%
-        fill(rn,.direction="down") %>%
+        fill(rn,.direction="down") 
+      if(!any(mesh_df$title_or_mesh=="mesh")){
+        mesh_df %<>% 
+          bind_rows(mesh_df %>% 
+                      mutate(title_mesh=NA,
+                             title_or_mesh="mesh"))
+      }
+      mesh_df %<>%
         spread(title_or_mesh,title_mesh)
       
       mesh_df2<-mesh_df %>% filter(!is.na(mesh)) %>%
@@ -211,8 +217,8 @@ get_pubmed_full<-function(query,max_return=20) {
       })
       
       data %<>%
-        bind_rows(data.frame(retrieve_ord=seq(chk_seq[k],(chk_seq[k+1]-1)),
-                             pubmed_id=ids[chk_seq[k]:(chk_seq[k+1]-1)],
+        bind_rows(data.frame(retrieve_ord=seq(chk_seq[k],(chk_seq[k+1]-1))[seq_along(pubmed_ids)],
+                             pubmed_id=pubmed_ids,
                              title=unlist(title),
                              author=unlist(author),
                              journal=unlist(journal),

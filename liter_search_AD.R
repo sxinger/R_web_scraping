@@ -13,13 +13,18 @@ require_libraries(c("XML",
                     "ggplot2",
                     "ggrepel"))
 
-AD_syn<-c("alzheimer")
+AD_syn<-c("alzheimer","dementia")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("predictive","machine learning",
-           "algorithm","analytics",
-           "multivariate","feature selection",
-           "big data","large data","high-dimensional data")
+Alg_syn<-c("predictive",
+           "algorithm",
+           "analytics",
+           "machine learning",
+           "multivariate",
+           "feature selection",
+           "big data",
+           "large data",
+           "high-dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
                         key2=c(EMR_syn,Alg_syn),
@@ -27,18 +32,7 @@ query_grid<-expand.grid(key1=AD_syn,
   mutate(query_key=paste0(key1," AND ", key2))
 
 ##==============pubmed===========
-require_libraries("rentrez","tm")
-stopwords_regex<-paste0('\\b',
-                        paste(stopwords('en'), collapse = '\\b|\\b'),
-                        '\\b')
-query_item<-c("&as_epq=",
-              "&as_oq=",
-              "&as_eq=",
-              "&as_occt=any",
-              "&as_sauthors=",
-              "&as_publication=",
-              "&as_yhi=",
-              "&hl=en&as_sdt=0%2C5")
+require_libraries("rentrez")
 
 liter_data<-c()
 liter_meta<-c()
@@ -71,23 +65,6 @@ for(i in seq_len(nrow(query_grid))){
     metadata<-liter$metadata %>% mutate(filter_cnt=filter_cnt)
   }
   
-  #collect citations from google scholar
-  for(q in seq_len(nrow(liter_data_i))){
-    start_q<-Sys.time()
-    
-    title<-liter_data_i$title[q]
-    cite_q<-get_google_scholar_citation(title)
-    cite<-c(cite,cite_q)
-    
-    lapse_q<-Sys.time()-start_q
-    cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
-  }
-  
-  liter_data_i %<>%
-    mutate(cited_by=cite) %>%
-    separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
-    dplyr::select(-cited_by)
-  
   #stack results
   liter_data %<>% bind_rows(liter_data_i)
   liter_meta %<>% bind_rows(metadata)
@@ -99,6 +76,40 @@ liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
 
+
+# #collect citations from google scholar
+# require_libraries("rentrez","tm")
+# stopwords_regex<-paste0('\\b',
+#                         paste(stopwords('en'), collapse = '\\b|\\b'),
+#                         '\\b')
+# query_item<-c("&as_epq=",
+#               "&as_oq=",
+#               "&as_eq=",
+#               "&as_occt=any",
+#               "&as_sauthors=",
+#               "&as_publication=",
+#               "&as_yhi=",
+#               "&hl=en&as_sdt=0%2C5")
+# 
+# liter_pubmed<-readRDS("./data/pubmed_search_result.rda")
+# liter_data<-liter_pubmed$liter_data
+# for(q in seq_len(nrow(liter_date))){
+#   start_q<-Sys.time()
+#   
+#   title<-liter_data_i$title[q]
+#   cite_q<-get_google_scholar_citation(title)
+#   cite<-c(cite,cite_q)
+#   
+#   lapse_q<-Sys.time()-start_q
+#   cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
+# }
+# 
+# liter_data %<>%
+#   mutate(cited_by=cite) %>%
+#   separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
+#   dplyr::select(-cited_by)
+# liter_pubmed$liter_data<-liter_data
+# saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
 
 ##==============scopus=============
 require_libraries("rscopus")
