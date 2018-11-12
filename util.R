@@ -317,6 +317,36 @@ get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=
 #   
 # }
 
+get_google_scholar_citation<-function(title){
+  #sleep before start
+  brk_t<-sample(20:40,1)
+  Sys.sleep(brk_t)
+  keywd<-query
+  
+  #url-friendly version
+  query<-gsub(" ","+",title)
+  query_url<-paste("https://scholar.google.com/scholar?&as_q=",query,
+                   "&as_epq=&as_oq=&as_eq=&as_occt=any&as_sauthors=&as_publication=",
+                   "&as_ylo=&as_yhi=&hl=en&as_sdt=0%2C5",
+                   sep = "")
+  
+  #parse xml
+  # agent<-shuffle_agent()
+  get_url<-getURL(query_url)
+  query<-htmlParse(get_url,encoding="UTF-8")
+  
+  #retrieve citations
+  result<-xpathSApply(query,"//html//body//div[@class='gs_ab_mdw']",xmlValue)
+  cite<-xpathSApply(query,"//html//body//div[@class='gs_r gs_or gs_scl']//div[@class='gs_ri']//div[@class='gs_fl']",xmlValue)
+  cite_df<-data.frame(gs_fl=unlist(cite)) %>%
+    mutate(cited_by=as.numeric(gsub("Cited by ","",str_extract(cite,"(Cited by [[1-9]]+)+"))),
+           cited_wos=as.numeric(gsub("Web of Science: ","",str_extract(cite,"(Web of Science: [[1-9]]+)+")))) %>%
+    mutate(cited_by2=cited_by,cited_wos2=cited_wos) %>%
+    unite("cited_str",c("cited_by2","cited_wos2"),sep=",")
+
+  return(cite_df$cited_str[1])
+}
+
 get_google_scholar_full<-function(query,page=1){
   #sleep before start
   brk_t<-sample(30:60,1)

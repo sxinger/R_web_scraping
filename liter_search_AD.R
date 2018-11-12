@@ -61,6 +61,22 @@ for(i in seq_len(nrow(query_grid))){
       mutate(filter_cnt=filter_cnt)
     liter$metadata<-metadata
     
+    #collect citations from google scholar
+    for(q in seq_len(nrow(liter_data_i))){
+      start_q<-Sys.time()
+      
+      title<-liter_data_i$title[q]
+      cite_q<-get_google_scholar_citation(title)
+      cite<-c(cite,cite_q)
+      
+      lapse_q<-Sys.time()-start_q
+      cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
+    }
+    liter_data_i %<>%
+      mutate(cited_by=cite) %>%
+      separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
+      dplyr::select(-cited_by)
+    
     #stack results
     liter_data %<>% bind_rows(liter_data_i)
     liter_meta %<>% bind_rows(liter$metadata)
@@ -73,8 +89,28 @@ liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
 
+
+##---google scholar search for citation---
 liter_pubmed<-readRDS("./data/pubmed_search_result.rda")
-liter_pubmed$liter_meta %>% View
+data_raw<-liter_pubmed$liter_data
+cite<-c()
+for(q in seq_len(nrow(data_raw))){
+  start_q<-Sys.time()
+  
+  title<-data_raw$title[q]
+  cite_q<-get_google_scholar_citation(title)
+  cite<-c(cite,cite_q)
+  
+  lapse_q<-Sys.time()-start_q
+  cat("finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
+}
+
+data_raw %<>%
+  mutate(cited_by=cite) %>%
+  separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
+  dplyr::select(-cited_by)
+
+
 
 ##==============scopus=============
 require_libraries("rscopus")
@@ -380,7 +416,7 @@ for(i in seq_len(nrow(query_grid))){
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
 }
-##==============special treatment for google scholar search==============
+##==============google scholar==============
 data<-c()
 metadata<-c()
 
