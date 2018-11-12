@@ -185,14 +185,14 @@ get_pubmed_full<-function(query,max_return=20) {
         mutate(rn=rank(rn)) %>% arrange(rn)
       
       #retrieve domain
-      domain<-xpathSApply(data_pubmed, "//PubmedArticle", function(x) {
+      domain<-xpathSApply(data_pubmed, "//PubmedArticle|//PubmedBookArticle", function(x) {
         val <- xpathSApply(x, "./MedlineCitation", xmlGetAttr,"Status")
         if (length(val)==0) val <- NA_character_
         val
       })
       
       #retrieve grants
-      grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+      grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
         val <- xpathSApply(x, "./GrantList[@CompleteYN='Y']/Grant/GrantID", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
@@ -200,7 +200,7 @@ get_pubmed_full<-function(query,max_return=20) {
       grands<-lapply(grands,function(x) paste(unlist(x),collapse=","))
       
       #retrieve abstracts for the searched IDs
-      abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article", function(x) {
+      abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
         val <- xpathSApply(x, "./Abstract", xmlValue)
         if (length(val)==0) val <- NA_character_
         val
