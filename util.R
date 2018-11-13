@@ -43,10 +43,10 @@ shuffle_agent<-function(){
 }
 
 url_random<-function(title){
-  title<-str_replace_all(title,stopwords_regex,"")
+  # title<-str_replace_all(title,stopwords_regex,"")
   query_obj<-strsplit(title," ")[[1]]
   query_obj<-query_obj[query_obj!=""]
-  len_r<-sample(seq(min(3,length(query_obj)),length(query_obj)),1)
+  len_r<-sample(seq(min(6,length(query_obj)),length(query_obj)),1)
   query<-paste(query_obj[1:len_r],collapse="+")
   
   yr_r<-sample(seq(1990,2009),1)
@@ -168,6 +168,17 @@ get_pubmed_full<-function(query,max_return=20) {
         if (length(val)==0) val <- NA_character_
         val
       })
+      if(!is.list(mesh_major)){
+        mesh_major<-paste(mesh_major,collapse=";")
+      }else{
+        mesh_major<-sapply(mesh_major,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))
+      }
+      if(!is.list(mesh_minor)){
+        mesh_minor<-paste(mesh_minor,collapse=";")
+      }else{
+        mesh_minor<-sapply(mesh_minor,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))
+      }
+      
       mesh_df<-data.frame(id_mesh=unlist(mesh_term),stringsAsFactors = F) %>%
         mutate(rn=1:n()) %>%
         mutate(id_or_mesh=ifelse(id_mesh %in% unlist(ids[chk_seq[k]:(chk_seq[k+1]-1)]),"id","mesh"),
@@ -178,8 +189,8 @@ get_pubmed_full<-function(query,max_return=20) {
       }
       mesh_df %<>% spread(id_or_mesh,id_mesh)
       mesh_df2<-mesh_df %>% filter(!is.na(mesh)) %>%
-        mutate(mesh_major=sapply(mesh_major,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";")))),
-               mesh_minor=sapply(mesh_minor,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))) %>%
+        mutate(mesh_major=mesh_major,
+               mesh_minor=mesh_minor) %>%
         bind_rows(mesh_df %>% filter(is.na(mesh)) %>% mutate(mesh_major=NA, mesh_minor=NA)) %>%
         mutate(rn=rank(rn)) %>% arrange(rn)
       
