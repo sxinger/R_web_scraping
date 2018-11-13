@@ -59,6 +59,10 @@ url_random<-function(title){
 }
 
 get_pubmed_full<-function(query,max_return=20) {
+  #sleep before start
+  brk_t<-sample(15:30,1)
+  Sys.sleep(brk_t)
+  
   # formulate the query term
   query<-paste(query,"('2010/01/01'[PDat]:'3000/12/31'[PDat])") # date restriction
   query<-gsub("'", "%22", gsub(" ", "+", query))
@@ -173,12 +177,12 @@ get_pubmed_full<-function(query,max_return=20) {
         if (length(val)==0) val <- NA_character_
         val
       })
-      if(!is.list(mesh_major)){
+      if(!is.list(mesh_major)|length(mesh_major)==0){
         mesh_major<-paste(mesh_major,collapse=";")
       }else{
         mesh_major<-sapply(mesh_major,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))
       }
-      if(!is.list(mesh_minor)){
+      if(!is.list(mesh_minor)|length(mesh_minor)==0){
         mesh_minor<-paste(mesh_minor,collapse=";")
       }else{
         mesh_minor<-sapply(mesh_minor,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))
@@ -190,13 +194,14 @@ get_pubmed_full<-function(query,max_return=20) {
                rn=ifelse(id_mesh %in% unlist(ids[chk_seq[k]:(chk_seq[k+1]-1)]),rn,NA)) %>%
         fill(rn,.direction="up") 
       if(!any(mesh_df$id_or_mesh=="mesh")){
-        mesh_df %<>%bind_rows(mesh_df %>% mutate(id_mesh=NA,id_or_mesh="mesh"))
+        mesh_df %<>% bind_rows(mesh_df %>% mutate(id_mesh=NA,id_or_mesh="mesh"))
       }
       mesh_df %<>% spread(id_or_mesh,id_mesh)
       mesh_df2<-mesh_df %>% filter(!is.na(mesh)) %>%
         mutate(mesh_major=mesh_major,
                mesh_minor=mesh_minor) %>%
-        bind_rows(mesh_df %>% filter(is.na(mesh)) %>% mutate(mesh_major=NA, mesh_minor=NA)) %>%
+        bind_rows(mesh_df %>% filter(is.na(mesh)) %>% 
+                    mutate(mesh_major=NA, mesh_minor=NA)) %>%
         mutate(rn=rank(rn)) %>% arrange(rn)
       
       #retrieve domain

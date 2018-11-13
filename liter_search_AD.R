@@ -18,7 +18,7 @@ EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
 Alg_syn<-c("predictive","algorithm","analytics",
            "machine learning","multivariate",
-           "feature selection","biomarker",
+           "feature selection","biomarker","data mining",
            "big data","large data","high dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
