@@ -135,7 +135,12 @@ get_pubmed_full<-function(query,max_return=20) {
         val
       })
       author<-mapply(function(x,y) paste(unlist(x),unlist(y),sep=","),author_ln,author_fn)
-      author<-sapply(author, function(x) paste(unlist(x),collapse = ";"))
+      if(!is.list(author)){
+        author<-paste(author,collapse = ";")
+      }else{
+        author<-sapply(author, function(x) paste(unlist(x),collapse = ";"))
+      }
+      
       
       #retrieve publication date
       pub_yr<-xpathSApply(data_pubmed, "//PubmedData//History|//PubmedBookData//History", function(x) {

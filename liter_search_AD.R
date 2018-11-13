@@ -70,39 +70,39 @@ liter_pubmed<-list(liter_data=liter_data,
 saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
 
 
-# #collect citations from google scholar
-# require_libraries(c("rentrez","tm"))
-# stopwords_regex<-paste0('\\b',
-#                         paste(stopwords('en'), collapse = '\\b|\\b'),
-#                         '\\b')
-# query_item<-c("&as_epq=",
-#               "&as_oq=",
-#               "&as_eq=",
-#               "&as_occt=any",
-#               "&as_sauthors=",
-#               "&as_publication=",
-#               "&as_yhi=",
-#               "&hl=en&as_sdt=0%2C5")
-# 
-# liter_pubmed<-readRDS("./data/AD_pubmed_search_result.rda")
-# liter_data<-liter_pubmed$liter_data
-# for(q in seq_len(nrow(liter_date))){
-#   start_q<-Sys.time()
-# 
-#   title<-liter_data$title[q]
-#   cite_q<-get_google_scholar_citation(title)
-#   cite<-c(cite,cite_q)
-# 
-#   lapse_q<-Sys.time()-start_q
-#   cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
-# }
-# 
-# liter_data %<>%
-#   mutate(cited_by=cite) %>%
-#   separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
-#   dplyr::select(-cited_by)
-# liter_pubmed$liter_data<-liter_data
-# saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
+#collect citations from google scholar
+require_libraries(c("rentrez","tm"))
+stopwords_regex<-paste0('\\b',
+                        paste(stopwords('en'), collapse = '\\b|\\b'),
+                        '\\b')
+query_item<-c("&as_epq=",
+              "&as_oq=",
+              "&as_eq=",
+              "&as_occt=any",
+              "&as_sauthors=",
+              "&as_publication=",
+              "&as_yhi=",
+              "&hl=en&as_sdt=0%2C5")
+
+liter_pubmed<-readRDS("./data/AD_pubmed_search_result.rda")
+liter_data<-liter_pubmed$liter_data
+for(q in seq_len(nrow(liter_date))){
+  start_q<-Sys.time()
+
+  title<-liter_data$title[q]
+  cite_q<-get_google_scholar_citation(title)
+  cite<-c(cite,cite_q)
+
+  lapse_q<-Sys.time()-start_q
+  cat(query,"...finish get citation data for<",title,">in",lapse_q,units(lapse_q),".\n")
+}
+
+liter_data %<>%
+  mutate(cited_by=cite) %>%
+  separate("cited_by",c("cited_by_gs","cited_by_wos"),",") %>%
+  dplyr::select(-cited_by)
+liter_pubmed$liter_data<-liter_data
+saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
 
 ##==============scopus=============
 require_libraries("rscopus")
