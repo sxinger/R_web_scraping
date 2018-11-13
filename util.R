@@ -116,9 +116,12 @@ get_pubmed_full<-function(query,max_return=20) {
       
       #retrieve title
       title<-xpathSApply(data_pubmed,
-                        "//PubmedArticle//Article//ArticleTitle|
-                         //PubmedBookArticle//ArticleTitle",
-                        xmlValue)
+                        "//PubmedArticle//Article|//PubmedBookArticle//BookDocument",function(x) {
+        val <- xpathSApply(x, "./ArticleTitle", xmlValue)
+        if (length(val)==0) val <- xpathSApply(x,"//PubmedBookArticle//BookDocument//Book//BookTitle",
+                                               function(x) paste0("Book Name:",xmlValue(x)))
+        val
+      })
       
       #retrieve author
       author_ln<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
@@ -148,11 +151,12 @@ get_pubmed_full<-function(query,max_return=20) {
       
       #retrieve journal
       journal<-xpathSApply(data_pubmed, "//PubmedArticle//Article//Journal//Title|
-                                         //PubmedBookArticle//Book//BookTitle",
+                                         //PubmedBookArticle//BookDocument//Book//BookTitle",
                            xmlValue)
       
       #retrieve mesh terms
-      mesh_term<-xpathSApply(data_pubmed, "//PubmedArticle//Article//ArticleTitle|//PubmedBookArticle//ArticleTitle|
+      mesh_term<-xpathSApply(data_pubmed, "//PubmedArticle//PubmedData//ArticleIdList//ArticleId[@IdType='pubmed']|
+                                           //PubmedBookArticle//PubmedBookData//ArticleIdList//ArticleId[@IdType='pubmed']|
                                            //MeshHeadingList",xmlValue)
       mesh_major<-xpathSApply(data_pubmed, "//MeshHeadingList", function(x) {
         val <- xpathSApply(x, "./MeshHeading/DescriptorName[@MajorTopicYN='Y']", xmlValue)
@@ -164,20 +168,15 @@ get_pubmed_full<-function(query,max_return=20) {
         if (length(val)==0) val <- NA_character_
         val
       })
-      mesh_df<-data.frame(title_mesh=unlist(mesh_term),stringsAsFactors = F) %>%
+      mesh_df<-data.frame(id_mesh=unlist(mesh_term),stringsAsFactors = F) %>%
         mutate(rn=1:n()) %>%
-        mutate(title_or_mesh=ifelse(title_mesh %in% unlist(title),"title","mesh"),
-               rn=ifelse(title_mesh %in% unlist(title),rn,NA)) %>%
-        fill(rn,.direction="down") 
-      if(!any(mesh_df$title_or_mesh=="mesh")){
-        mesh_df %<>% 
-          bind_rows(mesh_df %>% 
-                      mutate(title_mesh=NA,
-                             title_or_mesh="mesh"))
+        mutate(id_or_mesh=ifelse(id_mesh %in% unlist(ids[chk_seq[k]:(chk_seq[k+1]-1)]),"id","mesh"),
+               rn=ifelse(id_mesh %in% unlist(ids[chk_seq[k]:(chk_seq[k+1]-1)]),rn,NA)) %>%
+        fill(rn,.direction="up") 
+      if(!any(mesh_df$id_or_mesh=="mesh")){
+        mesh_df %<>%bind_rows(mesh_df %>% mutate(id_mesh=NA,id_or_mesh="mesh"))
       }
-      mesh_df %<>%
-        spread(title_or_mesh,title_mesh)
-      
+      mesh_df %<>% spread(id_or_mesh,id_mesh)
       mesh_df2<-mesh_df %>% filter(!is.na(mesh)) %>%
         mutate(mesh_major=sapply(mesh_major,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";")))),
                mesh_minor=sapply(mesh_minor,function(x) unique(ifelse(is.na(x),NA,paste(x,collapse=";"))))) %>%
@@ -185,29 +184,31 @@ get_pubmed_full<-function(query,max_return=20) {
         mutate(rn=rank(rn)) %>% arrange(rn)
       
       #retrieve domain
-      domain<-xpathSApply(data_pubmed, "//PubmedArticle|//PubmedBookArticle", function(x) {
+      domain<-xpathSApply(data_pubmed, "//PubmedArticle|//PubmedBookArticle//Book", function(x) {
         val <- xpathSApply(x, "./MedlineCitation", xmlGetAttr,"Status")
-        if (length(val)==0) val <- NA_character_
+        if (length(val)==0) val <- "Book"
         val
       })
       
       #retrieve grants
-      grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
+      grands<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//BookDocument//Book", function(x) {
         val <- xpathSApply(x, "./GrantList[@CompleteYN='Y']/Grant/GrantID", xmlValue)
-        if (length(val)==0) val <- NA_character_
+        if (length(val)==0) val <- xpathSApply(x,"./Publisher/PublisherName",
+                                               function(x) paste0("Publisher:",xmlValue(x)))
         val
       })
-      grands<-lapply(grands,function(x) paste(unlist(x),collapse=","))
+      grands<-sapply(grands,function(x) paste(unlist(x),collapse=","))
       
       #retrieve abstracts for the searched IDs
-      abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//Book", function(x) {
+      abstract<-xpathSApply(data_pubmed, "//PubmedArticle//Article|//PubmedBookArticle//BookDocument", function(x) {
         val <- xpathSApply(x, "./Abstract", xmlValue)
-        if (length(val)==0) val <- NA_character_
+        if(length(val)==0) val <- xpathSApply(x, "./Abstract/AbstractText", xmlValue)
+        if(length(val)==0) val <- NA_character_
         val
       })
       
       #retrieve links
-      link<-xpathSApply(data_pubmed, "//PubmedData//ArticleIdList", function(x) {
+      link<-xpathSApply(data_pubmed, "//PubmedData//ArticleIdList|//PubmedBookArticle//PubmedBookData", function(x) {
         doi <- xpathSApply(x, "./ArticleId[@IdType='doi']", xmlValue)
         pmc <- xpathSApply(x, "./ArticleId[@IdType='pmc']", xmlValue)
         pubmed <- xpathSApply(x, "./ArticleId[@IdType='pubmed']", xmlValue)
@@ -223,7 +224,7 @@ get_pubmed_full<-function(query,max_return=20) {
                              author=unlist(author),
                              journal=unlist(journal),
                              date=unlist(paste(pub_yr,pub_mth,sep = "-")),
-                             abstract=unlist(abstract),
+                             abstract=abstract,
                              mesh_major=mesh_df2$mesh_major,
                              mesh_minor=mesh_df2$mesh_minor,
                              link=link,
@@ -366,7 +367,7 @@ get_scopus_full<-function(api_type=c("scopus","sciencedirect"),query,max_return=
 
 get_google_scholar_citation<-function(title){
   #sleep before start
-  brk_t<-sample(20:40,1)
+  brk_t<-sample(25:40,1)
   Sys.sleep(brk_t)
 
   #randomly generate url with different structure

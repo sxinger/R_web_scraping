@@ -16,15 +16,10 @@ require_libraries(c("XML",
 AD_syn<-c("alzheimer","dementia")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
-Alg_syn<-c("predictive",
-           "algorithm",
-           "analytics",
-           "machine learning",
-           "multivariate",
-           "feature selection",
-           "big data",
-           "large data",
-           "high-dimensional data")
+Alg_syn<-c("predictive","algorithm","analytics",
+           "machine learning","multivariate",
+           "feature selection","biomarker",
+           "big data","large data","high dimensional data")
 
 query_grid<-expand.grid(key1=AD_syn,
                         key2=c(EMR_syn,Alg_syn),
@@ -37,9 +32,6 @@ require_libraries("rentrez")
 liter_data<-c()
 liter_meta<-c()
 for(i in seq_len(nrow(query_grid))){
-  brk_t<-sample(10:30,1)
-  Sys.sleep(brk_t)
-  
   query<-query_grid$query_key[i]
   start_i<-Sys.time()
 
@@ -74,7 +66,7 @@ for(i in seq_len(nrow(query_grid))){
 }
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
-saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
+saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
 
 
 # #collect citations from google scholar
