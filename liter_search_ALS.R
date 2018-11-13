@@ -1,4 +1,4 @@
-#### web scraping for AD+machine learning ####
+#### web scraping for ALS+machine learning ####
 rm(list=ls())
 gc()
 
@@ -13,7 +13,7 @@ require_libraries(c("XML",
                     "ggplot2",
                     "ggrepel"))
 
-ALS_syn<-c("amyotrophic lateral sclerosis","ALS","Lou Gehrig")
+ALS_syn<-c("ALS","Lou Gehrig")
 EMR_syn<-c("electronic medical record","EMR",
            "electronic health record","EHR")
 Alg_syn<-c("predictive","algorithm","analytics",
@@ -54,7 +54,8 @@ for(i in seq_len(nrow(query_grid))){
     
     #collect filtered results
     filter_cnt<-nrow(liter_data_i)
-    metadata<-liter$metadata %>% mutate(filter_cnt=filter_cnt)
+    metadata<-liter$metadata %>% 
+      mutate(filter_cnt=filter_cnt,keywd=query)
   }
   
   #stack results
@@ -66,7 +67,7 @@ for(i in seq_len(nrow(query_grid))){
 }
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
-saveRDS(liter_pubmed,file="./data/pubmed_search_result.rda")
+saveRDS(liter_pubmed,file="./data/ALS_pubmed_search_result.rda")
 
 
 ##==============google scholar==============
