@@ -70,7 +70,7 @@ liter_pubmed<-list(liter_data=liter_data,
 saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
 
 
-#collect citations from google scholar
+#====collect citations from google scholar====
 require_libraries(c("rentrez","tm"))
 stopwords_regex<-paste0('\\b',
                         paste(stopwords('en'), collapse = '\\b|\\b'),
