@@ -13,11 +13,11 @@ require_libraries(c("XML",
                     "ggplot2",
                     "ggrepel"))
 
-CKD_syn<-c("chronic kidney","chronic renal","CKD",
-           "diabetic kidney","diabetic renal","diabetic nephropathy","DKD",
-           "end stage renal","ESRD")
-EMR_syn<-c("electronic medical record","EMR",
-           "electronic health record","EHR")
+CKD_syn<-c("chronic kidney","chronic renal",
+           "diabetic kidney","diabetic renal","diabetic nephropathy",
+           "end stage renal")
+EMR_syn<-c("electronic medical record",
+           "electronic health record")
 Alg_syn<-c("predictive","algorithm","analytics",
            "machine learning","multivariate",
            "feature selection","biomarker",
