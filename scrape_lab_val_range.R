@@ -4,6 +4,7 @@ source("./util.R")
 require_libraries(c("XML",
                     "RCurl",
                     "rvest",
+                    "httr",
                     "stringr",
                     "dplyr",
                     "tidyr",
@@ -31,53 +32,66 @@ lab_key<-readRDS("./data/var_lst.rda") %>%
                                `microalbumin, ran`="microalbumin",
                                `poc glucose`="glucose",
                                `absolute lymph count`="lymph",
+                               `alk phosphatase`="alp",
                                `absolute mono count`="mono",
                                `urine spec gravity`="urine specific gravity",
-                               `absolute eos count`="eosinophil")) %>%
+                               `absolute eos count`="eosinophil",
+                               `tv rest pulmonary artery pressure`="pulmonary artery pressure at rest")) %>%
   dplyr::select(Feature,rank,C_VISUAL_PATH,C_NAME,MOD,key_for_search)
 
 ####==============one-at-a-time google search===================
 keys<-unique(lab_key$key_for_search)
 normal_range<-c()
+normal_range_ref<-c()
 for(i in seq_along(keys)){
   start_i<-Sys.time()
   
   #sleep before start
-  brk_t<-sample(30:60,1)
+  brk_t<-sample(25:40,1)
   Sys.sleep(brk_t)
 
-  url<-paste0("https://google.com/search?q=",gsub(" ","+",keys[i]),"+lab+normal+range")
+  url<-paste0("https://google.com/search?q=",gsub(" ","+",keys[i]),"+normal+range")
   get_url<-GET(url)
   query<-htmlParse(get_url, encoding="UTF-8")
   range_parse<-xpathSApply(query,"//div[@class='KpMaL']",xmlValue)
+  range_ref<-xpathSApply(query,"//div[@class='hJND5c']//cite",xmlValue)
+  range_parse2<-xpathSApply(query,"//span[@class='st']",xmlValue)
   
   if(length(range_parse)==0){
-    range_parse<-NA
+    range_parse<-paste0(unlist(range_parse2),collapse = "||")
   }
   normal_range<-c(normal_range,range_parse)
+  normal_range_ref<-c(normal_range_ref,range_ref[1])
   
   lapse_i<-Sys.time()-start_i
   cat("finish search normal range for",keys[i],"in",lapse_i,units(lapse_i),".\n")
 }
+
 #--parsing out the value range
 #manually create a list of expressions suggesting ranges
-num<-"[0-9\\.]{1,}"
+num<-"[0-9\\.\\,\\%]{1,}"
 rg_exp<-paste0("(",
-               paste(paste("between",num,"and",num),
-                     paste("(less|greater) than (or equal to)",num),
-                     paste(num,"or (higher|less)"),
-                     paste(num," (to|-) ",num),
-                     collapse = ")|("),
+               paste(paste("between",num,"(and|to)",num),
+                     paste("(less|lower|greater|higher) than( or equal to)?",num),
+                     paste(num,"or (higher|more|lower|less)"),
+                     paste0(num," ?(to|-|–) ?",num),
+                     paste0("(normal){1,}.*is ",num,"(-)?",num,"? "),
+                     paste("is( normally)?",num),
+                     paste0("(>|<|>=|<=) ?",num),
+                     paste0(num," ?± ?",num),
+                     sep = ")|("),
                ")")
 
-max_sentence<-max(sapply(normal_range,function(x) str_count("\\.",x)),na.rm=T)
-range_df<-data.frame(keys=keys,raw_text=normal_range,stringsAsFactors = F) %>%
-  separate(raw_text,paste0("s",1:(max_sentence+5)),fill="right",extra="merge") %>%
-  gather(sentence,raw_text,-keys) %>%
-  filter(!is.na(raw_text)&grepl("[0:9]",raw_text)) %>%
-  mutate(lab_val2=str_replace(lab_val,rg_exp,"@@@@"),
-         lab_range=trimws(str_extract(lab_val,rg_exp),"both")) %>%
-  separate("lab_val2",c("rg_prefix","rg_suffix"),sep="@@@@",fill="right",extra="merge")
+range_df<-data.frame(keys=keys,
+                     raw_text=normal_range,
+                     ref_link=normal_range_ref,
+                     stringsAsFactors = F) %>%
+  mutate(lab_range=unlist(trimws(str_extract(tolower(raw_text),rg_exp),"both"))) %>%
+  mutate(raw_text2=str_replace(tolower(raw_text),rg_exp,"@@@@")) %>%
+  separate("raw_text2",c("text_bef","text_aft"),sep="@@@@",fill="right",extra="merge")
+
+saveRDS(range_df,file="./data/lab_value_range.rda")
+
 
 
 ####================one-shot scraping: meditect==================####

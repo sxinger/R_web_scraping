@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-var_lst.rda
+.Rdata
+abstr_key.rda
 CKD_pubmed_search_result.rda
 
