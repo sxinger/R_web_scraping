@@ -75,8 +75,6 @@ rg_exp<-paste0("(",
                      paste("(less|lower|greater|higher) than( or equal to)?",num),
                      paste(num,"or (higher|more|lower|less)"),
                      paste0(num," ?(to|-|–) ?",num),
-                     paste0("(normal){1,}.*is ",num,"(-)?",num,"? "),
-                     paste("is( normally)?",num),
                      paste0("(>|<|>=|<=) ?",num),
                      paste0(num," ?± ?",num),
                      sep = ")|("),
@@ -86,12 +84,12 @@ range_df<-data.frame(keys=keys,
                      raw_text=normal_range,
                      ref_link=normal_range_ref,
                      stringsAsFactors = F) %>%
-  mutate(lab_range=unlist(trimws(str_extract(tolower(raw_text),rg_exp),"both"))) %>%
+  mutate(lab_range=trimws(str_extract(tolower(raw_text),rg_exp),"both")) %>%
   mutate(raw_text2=str_replace(tolower(raw_text),rg_exp,"@@@@")) %>%
   separate("raw_text2",c("text_bef","text_aft"),sep="@@@@",fill="right",extra="merge")
 
 saveRDS(range_df,file="./data/lab_value_range.rda")
-
+write.csv(range_df,file="./data/lab_value_range.csv",row.names = F)
 
 
 ####================one-shot scraping: meditect==================####
