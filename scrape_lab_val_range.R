@@ -23,7 +23,7 @@ lab_key<-readRDS("./data/var_lst.rda") %>%
   mutate(key=ifelse(!is.na(MOD)&!grepl("(COMPONENT_ID)+",Feature),paste0(tolower(key),MOD),
                     tolower(key))) %>%
   mutate(key=str_replace_all(key,"@@","")) %>%
-  mutate(key_for_search=gsub("@.*","",key)) %>%
+  mutate(key_for_search=trimws(gsub("@.*","",key),"both")) %>%
   mutate(key_for_search=recode(key_for_search,
                                `bld urea nitrogen`="bun",
                                `microalb/cr ratio-urine random`="microalbumin creatinine ratio",
@@ -36,7 +36,10 @@ lab_key<-readRDS("./data/var_lst.rda") %>%
                                `absolute mono count`="mono",
                                `urine spec gravity`="urine specific gravity",
                                `absolute eos count`="eosinophil",
-                               `tv rest pulmonary artery pressure`="pulmonary artery pressure at rest")) %>%
+                               `tv rest pulmonary artery pressure`="pulmonary artery pressure at rest",
+                               `squamous epi cells`="squamous epithelial cells",
+                               `peak bp`="peak blood pressure",
+                               `baseline bp`="baseline blood pressure")) %>%
   dplyr::select(Feature,rank,C_VISUAL_PATH,C_NAME,MOD,key_for_search)
 
 ####==============one-at-a-time google search===================
@@ -72,10 +75,7 @@ for(i in seq_along(keys)){
 num<-"[0-9\\.\\,\\%]{1,}"
 rg_exp<-paste0("(",
                paste(paste("between",num,"(and|to)",num),
-                     paste("(less|lower|greater|higher) than( or equal to)?",num),
-                     paste(num,"or (higher|more|lower|less)"),
                      paste0(num," ?(to|-|–) ?",num),
-                     paste0("(>|<|>=|<=) ?",num),
                      paste0(num," ?± ?",num),
                      sep = ")|("),
                ")")
@@ -88,8 +88,46 @@ range_df<-data.frame(keys=keys,
   mutate(raw_text2=str_replace(tolower(raw_text),rg_exp,"@@@@")) %>%
   separate("raw_text2",c("text_bef","text_aft"),sep="@@@@",fill="right",extra="merge")
 
-saveRDS(range_df,file="./data/lab_value_range.rda")
-write.csv(range_df,file="./data/lab_value_range.csv",row.names = F)
+#auto-curation
+range_df2<-range_df %>% filter(!is.na(lab_range)) %>%
+  mutate(lab_range=gsub("\\,","",lab_range)) %>%
+  mutate(lab_num=str_extract_all(lab_range,num)) %>%
+  separate("lab_num",c("lab_low","lab_high"),sep=",",
+           extra="merge",fill="right") %>%
+  mutate(lab_low=gsub("(c\\(\")|(\")","",lab_low),
+         lab_high=gsub("(\")|(\"\\))","",lab_high)) %>%
+  mutate(percentage=ifelse(grepl("\\%",lab_low)|grepl("\\%",lab_high),T,F)) %>%
+  mutate(lab_low=str_replace(lab_low,"\\%",""),
+         lab_high=str_replace_all(lab_high,"\\%","")) %>%
+  mutate(lab_high=gsub("\\.$","",lab_high)) %>%
+  mutate(lab_low=as.numeric(lab_low),
+         lab_high=as.numeric(lab_high)) %>%
+  mutate(lab_low2=ifelse(lab_high<lab_low,lab_low-lab_high,lab_low),
+         lab_high2=ifelse(lab_high<lab_low,lab_low+lab_high,lab_high))
+
+#manual-curation
+range_df3<-range_df %>% filter(is.na(lab_range)) %>%
+  mutate(lab_range=recode(keys,
+                          "vitamin d"="20,50",
+                          "vitamin b12"="100,Inf",
+                          "c-reactive protein"="1.0,3.0",
+                          "left ventricular internal dimension in diastole"="-Inf,5.6",
+                          "bsa"="-Inf,1.7",
+                          "rbc, ua"="-Inf,4")) %>%
+  separate("lab_range",c("lab_low","lab_high"),sep=",") %>%
+  mutate(lab_low=as.numeric(lab_low),
+         lab_high=as.numeric(lab_high))
+
+#out
+lab_rg_cur<-range_df2 %>% dplyr::select(keys,lab_low2,lab_high2,raw_text,ref_link) %>%
+  dplyr::rename(lab_low=lab_low2,lab_high=lab_high2) %>%
+  bind_rows(range_df3 %>% dplyr::select(keys,lab_low,lab_high,raw_text,ref_link))
+
+lab_range<-lab_key %>%
+  left_join(lab_rg_cur,by=c("key_for_search"="keys"))
+
+saveRDS(lab_range,file="./data/lab_value_range.rda")
+write.csv(lab_range,file="./data/lab_value_range.csv",row.names = F)
 
 
 ####================one-shot scraping: meditect==================####
