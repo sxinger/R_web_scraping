@@ -65,6 +65,9 @@ for(i in seq_len(nrow(query_grid))){
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
 }
+liter_data %<>% filter(!duplicated(pubmed_id))
+write.csv(liter_data,file="./output/AD_pubmed_search_data.csv",row.names = F)
+
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
@@ -103,6 +106,14 @@ liter_data %<>%
   dplyr::select(-cited_by)
 liter_pubmed$liter_data<-liter_data
 saveRDS(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
+
+#remove duplicates
+liter_pubmed<-readRDS("./data/AD_pubmed_search_result.rda")
+liter_data<-liter_pubmed$liter_data %>%
+  
+liter_pubmed$liter_data<-liter_data
+save(liter_pubmed,file="./data/AD_pubmed_search_result.rda")
+write.csv(liter_data,file="./output/AD_pubmed_search_data.csv",row.names = F)
 
 ##==============scopus=============
 require_libraries("rscopus")

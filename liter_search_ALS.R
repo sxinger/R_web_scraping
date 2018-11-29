@@ -65,6 +65,9 @@ for(i in seq_len(nrow(query_grid))){
   lapse_i<-Sys.time()-start_i
   cat("finish searching query:'",query,"'in",lapse_i,units(lapse_i),".\n")
 }
+liter_data %<>% filter(!duplicated(pubmed_id))
+write.csv(liter_data,file="./output/ALS_pubmed_search_data.csv",row.names = F)
+
 liter_pubmed<-list(liter_data=liter_data,
                    liter_meta=liter_meta)
 saveRDS(liter_pubmed,file="./data/ALS_pubmed_search_result.rda")

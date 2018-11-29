@@ -2,8 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
-.Rdata
-.csv
-abstr_key.rda
-CKD_pubmed_search_result.rda
+*.Rdata
+*.csv
+*.rda
+
 
