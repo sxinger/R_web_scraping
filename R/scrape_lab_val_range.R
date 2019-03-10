@@ -111,9 +111,9 @@ range_df3<-range_df %>% filter(is.na(lab_range)) %>%
                           "vitamin d"="20,50",
                           "vitamin b12"="100,Inf",
                           "c-reactive protein"="1.0,3.0",
-                          "left ventricular internal dimension in diastole"="-Inf,5.6",
-                          "bsa"="-Inf,1.7",
-                          "rbc, ua"="-Inf,4")) %>%
+                          "left ventricular internal dimension in diastole"="0,5.6",
+                          "bsa"="0,1.7",
+                          "rbc, ua"="0,4")) %>%
   separate("lab_range",c("lab_low","lab_high"),sep=",") %>%
   mutate(lab_low=as.numeric(lab_low),
          lab_high=as.numeric(lab_high))
